@@ -2,6 +2,7 @@
   "app": {
     "modules_enabled": [
       "core_capture",
+      "brightness_detection",
       "demo"
     ],
     "window_geometry": {}
@@ -21,12 +22,31 @@
       "padding": 8
     },
     "overlay": {
-      "enabled": true,
+      "enabled": false,
       "show_active_screen_outline": false
     },
     "display": {
       "always_on_top": false
     }
+  },
+  "brightness_detection": {
+    "darken_threshold": 40,
+    "trigger_fraction": 0.3,
+    "change_fraction": 0.3,
+    "change_ignore_slots": [],
+    "detection_region": "top_left",
+    "detection_region_overrides": {},
+    "cooldown_min_ms": 2000,
+    "cast_detection_enabled": true,
+    "cast_min_fraction": 0.05,
+    "cast_max_fraction": 0.22,
+    "cast_confirm_frames": 2,
+    "cast_min_ms": 150,
+    "cast_max_ms": 3000,
+    "cast_cancel_grace_ms": 120,
+    "channeling_enabled": true,
+    "slot_baselines": [],
+    "slot_display_names": []
   },
   "demo": {
     "message": ""

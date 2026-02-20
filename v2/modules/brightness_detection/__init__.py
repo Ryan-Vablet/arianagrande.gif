@@ -1,0 +1,1 @@
+from modules.brightness_detection.module import BrightnessDetectionModule
