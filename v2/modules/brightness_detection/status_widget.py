@@ -34,12 +34,23 @@ class SlotStatusWidget(QWidget):
         self._key = module_key
         self._slot_buttons: list[QPushButton] = []
         self._build_ui()
+        self._core.subscribe("config.changed", self._on_config_changed)
+
+    def _on_config_changed(self, namespace: str = "") -> None:
+        if namespace != "core_capture":
+            return
+        cc_cfg = self._core.get_config("core_capture")
+        new_count = cc_cfg.get("slots", {}).get("count", 10)
+        if new_count != len(self._slot_buttons):
+            self._rebuild_ui()
 
     def _build_ui(self) -> None:
         layout = QHBoxLayout(self)
         layout.setContentsMargins(4, 4, 4, 4)
         layout.setSpacing(4)
+        self._populate_buttons(layout)
 
+    def _populate_buttons(self, layout: QHBoxLayout) -> None:
         cc_cfg = self._core.get_config("core_capture")
         slot_count = cc_cfg.get("slots", {}).get("count", 10)
 
@@ -50,6 +61,14 @@ class SlotStatusWidget(QWidget):
             btn.setStyleSheet(_btn_style(_STATE_COLORS["unknown"]))
             self._slot_buttons.append(btn)
             layout.addWidget(btn, 1)
+
+    def _rebuild_ui(self) -> None:
+        layout = self.layout()
+        for btn in self._slot_buttons:
+            layout.removeWidget(btn)
+            btn.deleteLater()
+        self._slot_buttons.clear()
+        self._populate_buttons(layout)
 
     def update_states(self, states: list[dict]) -> None:
         for state_dict in states:

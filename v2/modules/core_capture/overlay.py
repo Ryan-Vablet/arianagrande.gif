@@ -30,6 +30,7 @@ class CaptureOverlay(QWidget):
 
         self._setup_window()
         self._refresh_from_config()
+        self._core.subscribe("config.changed", self._on_config_changed)
 
     def _setup_window(self) -> None:
         self.setWindowFlags(
@@ -70,6 +71,10 @@ class CaptureOverlay(QWidget):
             logger.warning("Could not get monitor geometry: %s", e)
 
         self.setGeometry(self._monitor_geometry)
+
+    def _on_config_changed(self, namespace: str = "") -> None:
+        if namespace == self._key:
+            self._refresh_from_config()
 
     def set_capture_active(self, active: bool) -> None:
         self._capture_active = active

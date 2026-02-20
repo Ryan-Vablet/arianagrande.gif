@@ -77,6 +77,8 @@ class BrightnessDetectionModule(QObject, BaseModule, metaclass=_CombinedMeta):
             order=40,
         )
 
+        core.subscribe("config.changed", self._on_config_changed)
+
     def ready(self) -> None:
         cfg = self.core.get_config(self.key)
         saved = cfg.get("slot_baselines")
@@ -120,6 +122,10 @@ class BrightnessDetectionModule(QObject, BaseModule, metaclass=_CombinedMeta):
         if name == "baselines_calibrated":
             return self._analyzer.has_baselines if self._analyzer else False
         return None
+
+    def _on_config_changed(self, namespace: str = "") -> None:
+        if namespace in (self.key, "core_capture"):
+            self._sync_config_to_analyzer()
 
     def on_config_changed(self, key: str, value: Any) -> None:
         self._sync_config_to_analyzer()
