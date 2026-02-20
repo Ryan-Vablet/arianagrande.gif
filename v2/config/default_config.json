@@ -1,0 +1,11 @@
+{
+  "app": {
+    "modules_enabled": [
+      "demo"
+    ],
+    "window_geometry": {}
+  },
+  "demo": {
+    "message": "Hello from demo module"
+  }
+}
