@@ -50,6 +50,7 @@ class PriorityItemWidget(QFrame):
         rank: int,
         keybind: str,
         display_name: str,
+        core: Any = None,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
@@ -57,6 +58,7 @@ class PriorityItemWidget(QFrame):
         self._rank = rank
         self._keybind = keybind or "?"
         self._display_name = display_name or "Unidentified"
+        self._core = core
         self._state = "unknown"
         self._drag_start: QPoint | None = None
 
@@ -84,11 +86,11 @@ class PriorityItemWidget(QFrame):
         self._name_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         layout.addWidget(self._name_label, 1)
 
-        rule = normalize_activation_rule(item_data.get("activation_rule"))
-        rule_text = {"dot_refresh": "DOT", "require_glow": "GLW"}.get(rule, "")
+        rule_id = normalize_activation_rule(item_data.get("activation_rule"))
+        rule_text = self._get_rule_display(rule_id)
         self._rule_label = QLabel(rule_text)
         self._rule_label.setStyleSheet("font-family: monospace; font-size: 9px; color: #d3a75b;")
-        self._rule_label.setFixedWidth(30)
+        self._rule_label.setFixedWidth(40)
         self._rule_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         layout.addWidget(self._rule_label)
 
@@ -99,6 +101,13 @@ class PriorityItemWidget(QFrame):
         layout.addWidget(self._state_dot)
 
         self.update_state("unknown")
+
+    def _get_rule_display(self, rule_id: str) -> str:
+        if rule_id == "always":
+            return ""
+        if self._core and hasattr(self._core, "activation_rules"):
+            return self._core.activation_rules.get_label(rule_id)
+        return rule_id
 
     @property
     def item_data(self) -> dict:
@@ -140,17 +149,27 @@ class PriorityItemWidget(QFrame):
         if item_type not in ("slot", "manual"):
             return
         menu = QMenu(self)
-        if item_type == "slot":
+        rule_actions: dict[object, str] = {}
+        if item_type == "slot" and self._core and hasattr(self._core, "activation_rules"):
             current = normalize_activation_rule(self._item_data.get("activation_rule"))
-            act_always = menu.addAction("Activation: Always")
-            act_always.setCheckable(True)
-            act_always.setChecked(current == "always")
-            act_dot = menu.addAction("Activation: DoT Refresh")
-            act_dot.setCheckable(True)
-            act_dot.setChecked(current == "dot_refresh")
-            act_glow = menu.addAction("Activation: Require Glow")
-            act_glow.setCheckable(True)
-            act_glow.setChecked(current == "require_glow")
+            grouped = self._core.activation_rules.list_grouped()
+            if len(grouped) <= 1:
+                for rules in grouped.values():
+                    for rule in rules:
+                        act = menu.addAction(f"Activation: {rule.label}")
+                        act.setCheckable(True)
+                        act.setChecked(current == rule.id)
+                        rule_actions[act] = rule.id
+            else:
+                activation_menu = menu.addMenu("Activation")
+                for group_key, rules in grouped.items():
+                    group_label = rules[0].group_label if rules else group_key
+                    submenu = activation_menu.addMenu(group_label)
+                    for rule in rules:
+                        act = submenu.addAction(rule.label)
+                        act.setCheckable(True)
+                        act.setChecked(current == rule.id)
+                        rule_actions[act] = rule.id
             menu.addSeparator()
         remove_action = menu.addAction("Remove")
         chosen = menu.exec(event.globalPos())
@@ -161,13 +180,8 @@ class PriorityItemWidget(QFrame):
             return
         if chosen == remove_action:
             panel._remove_item(self._rank)
-        elif item_type == "slot":
-            if chosen == act_always:
-                panel._set_activation_rule(self._rank, "always")
-            elif chosen == act_dot:
-                panel._set_activation_rule(self._rank, "dot_refresh")
-            elif chosen == act_glow:
-                panel._set_activation_rule(self._rank, "require_glow")
+        elif chosen in rule_actions:
+            panel._set_activation_rule(self._rank, rule_actions[chosen])
 
     def _find_panel(self) -> Optional["PriorityPanel"]:
         p = self.parent()
@@ -298,7 +312,7 @@ class PriorityPanel(QWidget):
             else:
                 continue
 
-            w = PriorityItemWidget(item, rank, kb, name, self._list_container)
+            w = PriorityItemWidget(item, rank, kb, name, core=self._core, parent=self._list_container)
             self._list_layout.insertWidget(self._list_layout.count() - 1, w)
             self._item_widgets.append(w)
 

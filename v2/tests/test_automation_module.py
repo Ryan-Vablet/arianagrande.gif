@@ -32,6 +32,10 @@ def core():
     c.panels = MagicMock()
     c.settings = MagicMock()
     c.windows = MagicMock()
+
+    from src.core.activation_rules import ActivationRuleRegistry
+    c.activation_rules = ActivationRuleRegistry()
+
     return c
 
 
@@ -66,6 +70,19 @@ class TestSetup:
         assert cfg.get("active_list_id") == "default"
         assert isinstance(cfg.get("priority_lists"), list)
         assert len(cfg["priority_lists"]) >= 1
+
+
+class TestActivationRules:
+    def test_setup_registers_always_rule(self, core, module):
+        rule = core.activation_rules.get("always")
+        assert rule is not None
+        assert rule.label == "Always"
+        assert rule.owner == "automation"
+
+    def test_registry_accessible_via_core(self, core, module):
+        rules = core.activation_rules.list_rules()
+        assert len(rules) >= 1
+        assert any(r.id == "always" for r in rules)
 
 
 class TestArmDisarm:

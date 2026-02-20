@@ -54,6 +54,15 @@ class AutomationModule(QObject, BaseModule, metaclass=_CombinedMeta):
 
         self._key_sender = KeySender()
 
+        core.activation_rules.register(
+            id="always",
+            label="Always",
+            group="general",
+            group_label="General",
+            owner=self.key,
+            order=0,
+        )
+
         core.panels.register(
             id=f"{self.key}/controls",
             area="primary",
