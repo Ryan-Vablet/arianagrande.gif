@@ -3,6 +3,7 @@
     "modules_enabled": [
       "core_capture",
       "brightness_detection",
+      "automation",
       "demo"
     ],
     "window_geometry": {}
@@ -47,6 +48,53 @@
     "channeling_enabled": true,
     "slot_baselines": [],
     "slot_display_names": []
+  },
+  "automation": {
+    "min_press_interval_ms": 150,
+    "gcd_ms": 1500,
+    "target_window_title": "",
+    "allow_cast_while_casting": false,
+    "queue_window_ms": 120,
+    "queue_whitelist": [],
+    "queue_timeout_ms": 5000,
+    "queue_fire_delay_ms": 100,
+    "active_list_id": "default",
+    "keybinds": [
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      ""
+    ],
+    "slot_display_names": [
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      ""
+    ],
+    "priority_lists": [
+      {
+        "id": "default",
+        "name": "Default",
+        "toggle_bind": "",
+        "single_fire_bind": "",
+        "priority_items": [],
+        "manual_actions": []
+      }
+    ]
   },
   "demo": {
     "message": ""
