@@ -8,15 +8,15 @@
   },
   "core_capture": {
     "monitor_index": 1,
-    "polling_fps": 19,
+    "polling_fps": 20,
     "bounding_box": {
-      "top": 899,
+      "top": 912,
       "left": 500,
       "width": 400,
       "height": 50
     },
     "slots": {
-      "count": 10,
+      "count": 11,
       "gap": 8,
       "padding": 8
     },
@@ -29,6 +29,6 @@
     }
   },
   "demo": {
-    "message": "Hello from demo module"
+    "message": ""
   }
 }

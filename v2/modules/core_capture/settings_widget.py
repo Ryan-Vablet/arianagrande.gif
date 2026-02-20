@@ -268,8 +268,30 @@ class DisplayOverlaySettings(_SaveMixin, QWidget):
     def _connect_signals(self) -> None:
         self._combo_monitor.currentIndexChanged.connect(self._save_all)
         self._check_aot.toggled.connect(self._save_all)
-        self._check_overlay.toggled.connect(self._save_all)
+        self._check_overlay.toggled.connect(self._on_overlay_toggled)
         self._check_outline.toggled.connect(self._save_all)
+
+        self._core.subscribe(
+            "window.visibility_changed", self._on_window_visibility_changed
+        )
+
+    def _on_overlay_toggled(self, checked: bool) -> None:
+        self._save_all()
+        overlay_id = f"{self._key}/overlay"
+        if checked:
+            self._core.windows.show(overlay_id)
+        else:
+            self._core.windows.hide(overlay_id)
+
+    def _on_window_visibility_changed(self, window_id: str = "", visible: bool = False) -> None:
+        if window_id != f"{self._key}/overlay":
+            return
+        self._check_overlay.blockSignals(True)
+        self._check_overlay.setChecked(visible)
+        self._check_overlay.blockSignals(False)
+        cfg = self._read_cfg()
+        cfg.setdefault("overlay", {})["enabled"] = visible
+        self._write_cfg(cfg)
 
     def _save_all(self) -> None:
         cfg = self._read_cfg()

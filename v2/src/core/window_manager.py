@@ -27,6 +27,18 @@ class WindowManager:
     def __init__(self, config_manager: ConfigManager) -> None:
         self._config = config_manager
         self._registry: dict[str, WindowRegistration] = {}
+        self._visibility_callbacks: list[Callable[[str, bool], None]] = []
+
+    def on_visibility_changed(self, callback: Callable[[str, bool], None]) -> None:
+        """Register *callback(window_id, visible)* called after show/hide."""
+        self._visibility_callbacks.append(callback)
+
+    def _notify_visibility(self, id: str, visible: bool) -> None:
+        for cb in self._visibility_callbacks:
+            try:
+                cb(id, visible)
+            except Exception as e:
+                logger.warning("visibility callback failed for %s: %s", id, e)
 
     def register(
         self,
@@ -59,11 +71,13 @@ class WindowManager:
                 self._restore_geometry(entry)
         entry.instance.show()
         entry.instance.raise_()
+        self._notify_visibility(id, True)
 
     def hide(self, id: str) -> None:
         entry = self._registry.get(id)
         if entry and entry.instance:
             entry.instance.hide()
+            self._notify_visibility(id, False)
 
     def toggle(self, id: str) -> None:
         entry = self._registry.get(id)

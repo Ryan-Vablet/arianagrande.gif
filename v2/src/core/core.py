@@ -21,6 +21,10 @@ class Core:
         self.panels = PanelManager()
         self.settings = SettingsManager()
         self.windows = WindowManager(config)
+        self.windows.on_visibility_changed(self._on_window_visibility_changed)
+
+    def _on_window_visibility_changed(self, window_id: str, visible: bool) -> None:
+        self.emit("window.visibility_changed", window_id=window_id, visible=visible)
 
     # --- Config ---
     def get_config(self, namespace: str) -> dict:
