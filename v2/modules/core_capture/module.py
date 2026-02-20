@@ -49,6 +49,14 @@ class CoreCaptureModule(BaseModule):
         )
 
         core.settings.register(
+            path="detection/display",
+            factory=self._build_display_overlay_settings,
+            title="Display",
+            owner=self.key,
+            order=0,
+        )
+
+        core.settings.register(
             path="detection/capture_region",
             factory=self._build_capture_region_settings,
             title="Capture Region",
@@ -62,14 +70,6 @@ class CoreCaptureModule(BaseModule):
             title="Slot Layout",
             owner=self.key,
             order=20,
-        )
-
-        core.settings.register(
-            path="detection/overlay",
-            factory=self._build_overlay_settings,
-            title="Overlay & Display",
-            owner=self.key,
-            order=30,
         )
 
         core.windows.register(
@@ -189,9 +189,9 @@ class CoreCaptureModule(BaseModule):
         from modules.core_capture.settings_widget import SlotLayoutSettings
         return SlotLayoutSettings(self._core_ref(), self.key)
 
-    def _build_overlay_settings(self) -> Any:
-        from modules.core_capture.settings_widget import OverlayDisplaySettings
-        return OverlayDisplaySettings(self._core_ref(), self.key)
+    def _build_display_overlay_settings(self) -> Any:
+        from modules.core_capture.settings_widget import DisplayOverlaySettings
+        return DisplayOverlaySettings(self._core_ref(), self.key)
 
     def _build_overlay(self) -> Any:
         from modules.core_capture.overlay import CaptureOverlay

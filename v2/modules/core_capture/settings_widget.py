@@ -8,6 +8,7 @@ from PyQt6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QFormLayout,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QSpinBox,
@@ -18,10 +19,10 @@ from PyQt6.QtWidgets import (
 logger = logging.getLogger(__name__)
 
 
-def _label(text: str) -> QLabel:
+def _label(text: str, width: int = 80) -> QLabel:
     lbl = QLabel(text)
     lbl.setStyleSheet("color: #999; font-size: 11px;")
-    lbl.setMinimumWidth(80)
+    lbl.setMinimumWidth(width)
     lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
     return lbl
 
@@ -30,8 +31,31 @@ def _spin(min_val: int, max_val: int, value: int = 0) -> QSpinBox:
     s = QSpinBox()
     s.setRange(min_val, max_val)
     s.setValue(value)
-    s.setFixedWidth(90)
+    s.setMinimumWidth(70)
+    s.setMaximumWidth(100)
     return s
+
+
+def _field_pair(label: QLabel, spin: QSpinBox) -> QHBoxLayout:
+    """Label + spinbox packed tight, for use inside grid cells."""
+    row = QHBoxLayout()
+    row.setSpacing(4)
+    row.setContentsMargins(0, 0, 0, 0)
+    row.addWidget(label)
+    row.addWidget(spin)
+    return row
+
+
+def _capped_row(inner_layout: QVBoxLayout | QHBoxLayout | QGridLayout, max_width: int = 380) -> QHBoxLayout:
+    """Wrap a layout in a fixed-max-width container so it doesn't stretch with the panel."""
+    container = QWidget()
+    container.setLayout(inner_layout)
+    container.setMaximumWidth(max_width)
+    outer = QHBoxLayout()
+    outer.setContentsMargins(0, 0, 0, 0)
+    outer.addWidget(container)
+    outer.addStretch()
+    return outer
 
 
 class _SaveMixin:
@@ -52,7 +76,7 @@ class _SaveMixin:
 
 
 class CaptureRegionSettings(_SaveMixin, QWidget):
-    """Monitor selection, bounding box coordinates, polling FPS."""
+    """Bounding box coordinates."""
 
     def __init__(self, core: Any, module_key: str, parent: QWidget | None = None) -> None:
         QWidget.__init__(self, parent)
@@ -63,61 +87,40 @@ class CaptureRegionSettings(_SaveMixin, QWidget):
         self._connect_signals()
 
     def _build_ui(self) -> None:
+        LW = 55
+
         layout = QVBoxLayout(self)
         layout.setSpacing(8)
         layout.setContentsMargins(4, 4, 4, 4)
 
-        monitor_row = QHBoxLayout()
-        monitor_row.addWidget(_label("Monitor"))
-        self._combo_monitor = QComboBox()
-        self._combo_monitor.setFixedWidth(220)
-        self._load_monitors()
-        monitor_row.addWidget(self._combo_monitor)
-        monitor_row.addStretch()
-        layout.addLayout(monitor_row)
-
-        region_form = QFormLayout()
-        region_form.setSpacing(6)
         self._spin_top = _spin(0, 9999)
         self._spin_left = _spin(0, 9999)
         self._spin_width = _spin(1, 9999)
         self._spin_height = _spin(1, 9999)
-        region_form.addRow(_label("Top"), self._spin_top)
-        region_form.addRow(_label("Left"), self._spin_left)
-        region_form.addRow(_label("Width"), self._spin_width)
-        region_form.addRow(_label("Height"), self._spin_height)
-        layout.addLayout(region_form)
-
-        fps_form = QFormLayout()
-        fps_form.setSpacing(6)
         self._spin_fps = _spin(5, 120, 20)
-        fps_form.addRow(_label("Polling FPS"), self._spin_fps)
-        layout.addLayout(fps_form)
 
+        grid = QGridLayout()
+        grid.setHorizontalSpacing(14)
+        grid.setVerticalSpacing(6)
+
+        grid.addWidget(_label("Top", LW), 0, 0)
+        grid.addWidget(self._spin_top, 0, 1)
+        grid.addWidget(_label("Left", LW), 0, 2)
+        grid.addWidget(self._spin_left, 0, 3)
+
+        grid.addWidget(_label("Width", LW), 1, 0)
+        grid.addWidget(self._spin_width, 1, 1)
+        grid.addWidget(_label("Height", LW), 1, 2)
+        grid.addWidget(self._spin_height, 1, 3)
+
+        grid.addWidget(_label("Poll FPS", LW), 2, 0)
+        grid.addWidget(self._spin_fps, 2, 1)
+
+        layout.addLayout(_capped_row(grid, 360))
         layout.addStretch()
-
-    def _load_monitors(self) -> None:
-        try:
-            from src.capture.screen_capture import ScreenCapture
-            sc = ScreenCapture(monitor_index=1)
-            sc.start()
-            monitors = sc.list_monitors()
-            sc.stop()
-            for i, mon in enumerate(monitors):
-                idx = i + 1
-                w, h = mon.get("width", "?"), mon.get("height", "?")
-                self._combo_monitor.addItem(f"Monitor {idx}  ({w}x{h})", idx)
-        except Exception as e:
-            logger.warning("Failed to list monitors: %s", e)
-            self._combo_monitor.addItem("Monitor 1", 1)
 
     def _populate(self) -> None:
         cfg = self._read_cfg()
-        monitor_index = int(cfg.get("monitor_index", 1))
-        for i in range(self._combo_monitor.count()):
-            if self._combo_monitor.itemData(i) == monitor_index:
-                self._combo_monitor.setCurrentIndex(i)
-                break
         bb = cfg.get("bounding_box", {})
         self._spin_top.setValue(int(bb.get("top", 900)))
         self._spin_left.setValue(int(bb.get("left", 500)))
@@ -126,7 +129,6 @@ class CaptureRegionSettings(_SaveMixin, QWidget):
         self._spin_fps.setValue(int(cfg.get("polling_fps", 20)))
 
     def _connect_signals(self) -> None:
-        self._combo_monitor.currentIndexChanged.connect(self._save_all)
         self._spin_top.valueChanged.connect(self._save_all)
         self._spin_left.valueChanged.connect(self._save_all)
         self._spin_width.valueChanged.connect(self._save_all)
@@ -135,7 +137,6 @@ class CaptureRegionSettings(_SaveMixin, QWidget):
 
     def _save_all(self) -> None:
         cfg = self._read_cfg()
-        cfg["monitor_index"] = self._combo_monitor.currentData() or 1
         cfg["polling_fps"] = self._spin_fps.value()
         cfg["bounding_box"] = {
             "top": self._spin_top.value(),
@@ -162,15 +163,16 @@ class SlotLayoutSettings(_SaveMixin, QWidget):
         layout.setSpacing(8)
         layout.setContentsMargins(4, 4, 4, 4)
 
-        form = QFormLayout()
-        form.setSpacing(6)
         self._spin_slot_count = _spin(1, 100)
         self._spin_slot_gap = _spin(0, 50)
         self._spin_slot_padding = _spin(0, 50)
-        form.addRow(_label("Count"), self._spin_slot_count)
-        form.addRow(_label("Gap px"), self._spin_slot_gap)
-        form.addRow(_label("Padding px"), self._spin_slot_padding)
-        layout.addLayout(form)
+
+        slot_row = QHBoxLayout()
+        slot_row.setSpacing(16)
+        slot_row.addLayout(_field_pair(_label("Count", 50), self._spin_slot_count))
+        slot_row.addLayout(_field_pair(_label("Gap px", 50), self._spin_slot_gap))
+        slot_row.addLayout(_field_pair(_label("Pad px", 50), self._spin_slot_padding))
+        layout.addLayout(_capped_row(slot_row, 460))
 
         layout.addStretch()
 
@@ -196,8 +198,8 @@ class SlotLayoutSettings(_SaveMixin, QWidget):
         self._write_cfg(cfg)
 
 
-class OverlayDisplaySettings(_SaveMixin, QWidget):
-    """Overlay toggle, screen outline, always-on-top."""
+class DisplayOverlaySettings(_SaveMixin, QWidget):
+    """Monitor selection, overlay toggles, always-on-top."""
 
     def __init__(self, core: Any, module_key: str, parent: QWidget | None = None) -> None:
         QWidget.__init__(self, parent)
@@ -208,39 +210,75 @@ class OverlayDisplaySettings(_SaveMixin, QWidget):
         self._connect_signals()
 
     def _build_ui(self) -> None:
+        LW = 65
+
         layout = QVBoxLayout(self)
-        layout.setSpacing(6)
+        layout.setSpacing(8)
         layout.setContentsMargins(4, 4, 4, 4)
+
+        self._combo_monitor = QComboBox()
+        self._combo_monitor.setMinimumWidth(160)
+        self._load_monitors()
+
+        self._check_aot = QCheckBox("Always on top")
+
+        monitor_row = QHBoxLayout()
+        monitor_row.setSpacing(14)
+        monitor_row.addWidget(_label("Monitor", LW))
+        monitor_row.addWidget(self._combo_monitor)
+        monitor_row.addWidget(self._check_aot)
+        monitor_row.addStretch()
+        layout.addLayout(monitor_row)
 
         self._check_overlay = QCheckBox("Show capture overlay")
         self._check_outline = QCheckBox("Show active screen outline")
-        self._check_aot = QCheckBox("Always on top")
 
         layout.addWidget(self._check_overlay)
         layout.addWidget(self._check_outline)
-        layout.addWidget(self._check_aot)
         layout.addStretch()
+
+    def _load_monitors(self) -> None:
+        try:
+            from src.capture.screen_capture import ScreenCapture
+            sc = ScreenCapture(monitor_index=1)
+            sc.start()
+            monitors = sc.list_monitors()
+            sc.stop()
+            for i, mon in enumerate(monitors):
+                idx = i + 1
+                w, h = mon.get("width", "?"), mon.get("height", "?")
+                self._combo_monitor.addItem(f"Monitor {idx}  ({w}x{h})", idx)
+        except Exception as e:
+            logger.warning("Failed to list monitors: %s", e)
+            self._combo_monitor.addItem("Monitor 1", 1)
 
     def _populate(self) -> None:
         cfg = self._read_cfg()
+        monitor_index = int(cfg.get("monitor_index", 1))
+        for i in range(self._combo_monitor.count()):
+            if self._combo_monitor.itemData(i) == monitor_index:
+                self._combo_monitor.setCurrentIndex(i)
+                break
+        display = cfg.get("display", {})
+        self._check_aot.setChecked(bool(display.get("always_on_top", False)))
         overlay = cfg.get("overlay", {})
         self._check_overlay.setChecked(bool(overlay.get("enabled", False)))
         self._check_outline.setChecked(bool(overlay.get("show_active_screen_outline", False)))
-        display = cfg.get("display", {})
-        self._check_aot.setChecked(bool(display.get("always_on_top", False)))
 
     def _connect_signals(self) -> None:
+        self._combo_monitor.currentIndexChanged.connect(self._save_all)
+        self._check_aot.toggled.connect(self._save_all)
         self._check_overlay.toggled.connect(self._save_all)
         self._check_outline.toggled.connect(self._save_all)
-        self._check_aot.toggled.connect(self._save_all)
 
     def _save_all(self) -> None:
         cfg = self._read_cfg()
+        cfg["monitor_index"] = self._combo_monitor.currentData() or 1
+        cfg["display"] = {
+            "always_on_top": self._check_aot.isChecked(),
+        }
         cfg["overlay"] = {
             "enabled": self._check_overlay.isChecked(),
             "show_active_screen_outline": self._check_outline.isChecked(),
-        }
-        cfg["display"] = {
-            "always_on_top": self._check_aot.isChecked(),
         }
         self._write_cfg(cfg)

@@ -32,7 +32,7 @@ def test_setup_registers_panels_settings_window(core):
     child_paths = [c["path"] for c in detection_tab["children"]]
     assert "detection/capture_region" in child_paths
     assert "detection/slot_layout" in child_paths
-    assert "detection/overlay" in child_paths
+    assert "detection/display" in child_paths
 
     entries = core.windows.list_menu_entries()
     assert any(e.id == "core_capture/overlay" for e in entries)

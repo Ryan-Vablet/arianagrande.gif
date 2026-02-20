@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import (
+    QApplication,
     QDialog,
     QFrame,
     QLabel,
@@ -43,8 +44,9 @@ class SettingsDialog(QDialog):
     def __init__(self, core: Core, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._core = core
+        self._user_resized = False
         self.setWindowTitle("Settings")
-        self.setMinimumSize(500, 600)
+        self.setMinimumSize(300, 200)
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -88,9 +90,40 @@ class SettingsDialog(QDialog):
             self.raise_()
             self.activateWindow()
         else:
+            if not self._user_resized:
+                self._auto_fit()
             self.show()
+
+    def _auto_fit(self) -> None:
+        """Resize to comfortably fit content, capped to 85% of the screen."""
+        self._tabs.adjustSize()
+        hint = self._tabs.sizeHint()
+
+        chrome_w = 8 * 2 + 2
+        chrome_h = 8 * 2 + 2
+        ideal_w = hint.width() + chrome_w + 24
+        ideal_h = hint.height() + chrome_h + 24
+
+        screen = QApplication.primaryScreen()
+        if screen is not None:
+            avail = screen.availableGeometry()
+            max_w = int(avail.width() * 0.85)
+            max_h = int(avail.height() * 0.85)
+            ideal_w = min(ideal_w, max_w)
+            ideal_h = min(ideal_h, max_h)
+
+        ideal_w = max(ideal_w, 300)
+        ideal_h = max(ideal_h, 200)
+
+        self.resize(ideal_w, ideal_h)
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        if self.isVisible():
+            self._user_resized = True
 
     def rebuild(self) -> None:
         while self._tabs.count():
             self._tabs.removeTab(0)
         self._build_tabs()
+        self._user_resized = False
