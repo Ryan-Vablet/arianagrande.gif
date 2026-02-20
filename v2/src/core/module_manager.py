@@ -119,6 +119,15 @@ class ModuleManager:
         self._load_order = [k for k in order if k in self.modules]
         logger.info("Module load order: %s", self._load_order)
 
+    def process_frame(self, frame: "np.ndarray") -> None:
+        for key in self._load_order:
+            mod = self.modules.get(key)
+            if mod is not None and mod.enabled:
+                try:
+                    mod.on_frame(frame)
+                except Exception as e:
+                    logger.exception("Module %s on_frame failed: %s", key, e)
+
     def get(self, key: str) -> BaseModule | None:
         return self.modules.get(key)
 

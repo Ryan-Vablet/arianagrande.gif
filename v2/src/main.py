@@ -35,6 +35,8 @@ def main() -> None:
     core = Core(config)
 
     module_manager = ModuleManager(core)
+    core._module_manager = module_manager
+
     module_manager.discover(MODULES_DIR)
 
     enabled = config.get("app").get("modules_enabled") or None
@@ -48,6 +50,10 @@ def main() -> None:
 
     window.show()
     exit_code = app.exec()
+
+    capture_mod = module_manager.get("core_capture")
+    if capture_mod and hasattr(capture_mod, "stop_capture"):
+        capture_mod.stop_capture()
 
     core.windows.teardown()
     module_manager.shutdown()

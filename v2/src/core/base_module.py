@@ -34,6 +34,18 @@ class BaseModule(ABC):
     def on_config_changed(self, key: str, value: Any) -> None:
         pass
 
+    def on_frame(self, frame: "np.ndarray") -> None:
+        """Called each capture cycle with the raw frame (BGR numpy array).
+
+        Only implement if the module needs per-frame processing.
+        Frame is the full captured region — modules crop what they need.
+
+        IMPORTANT: This is called from the capture worker thread, NOT the GUI thread.
+        Do not update Qt widgets directly. Use signals with Qt.QueuedConnection
+        to marshal updates to the GUI thread.
+        """
+        pass
+
     def on_enable(self) -> None:
         pass
 

@@ -1,9 +1,32 @@
 {
   "app": {
     "modules_enabled": [
+      "core_capture",
       "demo"
     ],
     "window_geometry": {}
+  },
+  "core_capture": {
+    "monitor_index": 1,
+    "polling_fps": 19,
+    "bounding_box": {
+      "top": 900,
+      "left": 500,
+      "width": 400,
+      "height": 50
+    },
+    "slots": {
+      "count": 10,
+      "gap": 5,
+      "padding": 6
+    },
+    "overlay": {
+      "enabled": true,
+      "show_active_screen_outline": false
+    },
+    "display": {
+      "always_on_top": false
+    }
   },
   "demo": {
     "message": "Hello from demo module"
