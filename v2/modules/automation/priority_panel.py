@@ -239,7 +239,7 @@ class PriorityPanel(QWidget):
         header = QHBoxLayout()
         title = QLabel("PRIORITY")
         title.setStyleSheet(
-            "font-family: monospace; font-size: 10px; color: #666;"
+            "font-family: monospace; font-size: 10px; color: #7a7a8e;"
             " font-weight: bold; letter-spacing: 1.5px;"
         )
         header.addWidget(title)

@@ -20,7 +20,8 @@ def _btn_style(color: str) -> str:
     return (
         f"QPushButton {{ background: {color}; color: white;"
         f" border: 1px solid #555; border-radius: 4px;"
-        f" font-size: 10px; font-weight: bold; font-family: monospace; }}"
+        f" font-size: 11px; font-weight: bold; font-family: monospace;"
+        f" padding: 2px 0px; }}"
     )
 
 
@@ -37,20 +38,18 @@ class SlotStatusWidget(QWidget):
     def _build_ui(self) -> None:
         layout = QHBoxLayout(self)
         layout.setContentsMargins(4, 4, 4, 4)
-        layout.setSpacing(3)
+        layout.setSpacing(4)
 
         cc_cfg = self._core.get_config("core_capture")
         slot_count = cc_cfg.get("slots", {}).get("count", 10)
 
         for i in range(slot_count):
             btn = QPushButton(str(i))
-            btn.setFixedSize(32, 32)
+            btn.setMinimumHeight(28)
             btn.setFlat(True)
             btn.setStyleSheet(_btn_style(_STATE_COLORS["unknown"]))
             self._slot_buttons.append(btn)
-            layout.addWidget(btn)
-
-        layout.addStretch()
+            layout.addWidget(btn, 1)
 
     def update_states(self, states: list[dict]) -> None:
         for state_dict in states:

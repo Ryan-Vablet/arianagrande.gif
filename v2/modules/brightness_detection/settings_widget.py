@@ -123,7 +123,7 @@ class BrightnessSettings(_SaveMixin, QWidget):
         cast_header = QLabel("CAST DETECTION")
         cast_header.setStyleSheet(
             "font-family: monospace; font-size: 10px; font-weight: bold;"
-            " letter-spacing: 1px; color: #666; padding-top: 6px;"
+            " letter-spacing: 1px; color: #7a7a8e; padding-top: 6px;"
         )
         layout.addWidget(cast_header)
 
@@ -249,7 +249,7 @@ class CalibrationSettings(_SaveMixin, QWidget):
         slot_header = QLabel("PER-SLOT RECALIBRATE")
         slot_header.setStyleSheet(
             "font-family: monospace; font-size: 10px; font-weight: bold;"
-            " letter-spacing: 1px; color: #666; padding-top: 6px;"
+            " letter-spacing: 1px; color: #7a7a8e; padding-top: 6px;"
         )
         layout.addWidget(slot_header)
 

@@ -16,7 +16,7 @@ THEME = {
     "text_primary": "#e0e0e0",
     "text_secondary": "#ccc",
     "text_label": "#999",
-    "text_title": "#666",
+    "text_title": "#7a7a8e",
     "text_accent": "#66eeff",
 }
 
