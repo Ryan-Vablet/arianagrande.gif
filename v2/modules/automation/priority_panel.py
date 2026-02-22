@@ -230,6 +230,11 @@ class PriorityPanel(QWidget):
         self._item_widgets: list[PriorityItemWidget] = []
         self._build_ui()
         self.refresh_from_config()
+        self._core.subscribe("config.changed", self._on_config_changed)
+
+    def _on_config_changed(self, namespace: str = "") -> None:
+        if namespace == self._module.key:
+            self.refresh_from_config()
 
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
@@ -303,7 +308,7 @@ class PriorityPanel(QWidget):
             if item_type == "slot":
                 idx = item.get("slot_index", 0)
                 kb = keybinds[idx] if idx < len(keybinds) else "?"
-                name = display_names[idx] if idx < len(display_names) and display_names[idx].strip() else f"Slot {idx}"
+                name = display_names[idx] if idx < len(display_names) and display_names[idx].strip() else f"Slot {idx + 1}"
             elif item_type == "manual":
                 aid = str(item.get("action_id", "")).lower()
                 action = manual_by_id.get(aid)
@@ -391,7 +396,7 @@ class PriorityPanel(QWidget):
         display_names = cfg.get("slot_display_names", [])
         for idx in available:
             kb = keybinds[idx] if idx < len(keybinds) else ""
-            name = display_names[idx] if idx < len(display_names) and display_names[idx].strip() else f"Slot {idx}"
+            name = display_names[idx] if idx < len(display_names) and display_names[idx].strip() else f"Slot {idx + 1}"
             label = f"[{kb or '?'}] {name}"
             item = QListWidgetItem(label)
             item.setData(Qt.ItemDataRole.UserRole, idx)

@@ -222,8 +222,18 @@ class CalibrationSettings(_SaveMixin, QWidget):
         self._key = module_key
         self._module_ref = module_ref
         self._slot_buttons: list[QPushButton] = []
+        self._slot_row_layout: QHBoxLayout | None = None
         self._build_ui()
         self._update_status()
+        self._core.subscribe("config.changed", self._on_config_changed)
+
+    def _on_config_changed(self, namespace: str = "") -> None:
+        if namespace != "core_capture":
+            return
+        cc_cfg = self._core.get_config("core_capture")
+        new_count = cc_cfg.get("slots", {}).get("count", 10)
+        if new_count != len(self._slot_buttons):
+            self._rebuild_slot_buttons()
 
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
@@ -253,22 +263,34 @@ class CalibrationSettings(_SaveMixin, QWidget):
         )
         layout.addWidget(slot_header)
 
-        cc_cfg = self._core.get_config("core_capture")
-        slot_count = cc_cfg.get("slots", {}).get("count", 10)
-
-        slot_row = QHBoxLayout()
-        slot_row.setSpacing(3)
-        for i in range(slot_count):
-            btn = QPushButton(str(i))
-            btn.setFixedSize(32, 32)
-            btn.setToolTip(f"Recalibrate slot {i}")
-            btn.clicked.connect(lambda checked, idx=i: self._on_calibrate_slot(idx))
-            self._slot_buttons.append(btn)
-            slot_row.addWidget(btn)
-        slot_row.addStretch()
-        layout.addLayout(slot_row)
+        self._slot_row_layout = QHBoxLayout()
+        self._slot_row_layout.setSpacing(3)
+        self._populate_slot_buttons()
+        layout.addLayout(self._slot_row_layout)
 
         layout.addStretch()
+
+    def _populate_slot_buttons(self) -> None:
+        cc_cfg = self._core.get_config("core_capture")
+        slot_count = cc_cfg.get("slots", {}).get("count", 10)
+        for i in range(slot_count):
+            btn = QPushButton(str(i + 1))
+            btn.setFixedSize(32, 32)
+            btn.setToolTip(f"Recalibrate slot {i + 1}")
+            btn.clicked.connect(lambda checked, idx=i: self._on_calibrate_slot(idx))
+            self._slot_buttons.append(btn)
+            self._slot_row_layout.addWidget(btn)
+        self._slot_row_layout.addStretch()
+
+    def _rebuild_slot_buttons(self) -> None:
+        for btn in self._slot_buttons:
+            self._slot_row_layout.removeWidget(btn)
+            btn.deleteLater()
+        self._slot_buttons.clear()
+        stretch = self._slot_row_layout.itemAt(self._slot_row_layout.count() - 1)
+        if stretch and stretch.spacerItem():
+            self._slot_row_layout.removeItem(stretch)
+        self._populate_slot_buttons()
 
     def _update_status(self) -> None:
         if self._module_ref and self._module_ref._analyzer:

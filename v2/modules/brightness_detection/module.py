@@ -210,7 +210,7 @@ class BrightnessDetectionModule(QObject, BaseModule, metaclass=_CombinedMeta):
             frame = capture.grab_region(bbox)
             self._analyzer.calibrate_single_slot(frame, slot_index)
             self._save_baselines()
-            return True, f"Slot {slot_index} calibrated ✓"
+            return True, f"Slot {slot_index + 1} calibrated ✓"
         except Exception as e:
             return False, str(e)
         finally:

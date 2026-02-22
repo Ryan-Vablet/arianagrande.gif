@@ -55,7 +55,7 @@ class SlotStatusWidget(QWidget):
         slot_count = cc_cfg.get("slots", {}).get("count", 10)
 
         for i in range(slot_count):
-            btn = QPushButton(str(i))
+            btn = QPushButton(str(i + 1))
             btn.setMinimumHeight(28)
             btn.setFlat(True)
             btn.setStyleSheet(_btn_style(_STATE_COLORS["unknown"]))
@@ -79,4 +79,4 @@ class SlotStatusWidget(QWidget):
                 color = _STATE_COLORS.get(slot_state, _STATE_COLORS["unknown"])
                 btn.setStyleSheet(_btn_style(color))
                 frac = state_dict.get("darkened_fraction", 0)
-                btn.setToolTip(f"Slot {idx}: {slot_state}\nDarkened: {frac:.1%}")
+                btn.setToolTip(f"Slot {idx + 1}: {slot_state}\nDarkened: {frac:.1%}")
