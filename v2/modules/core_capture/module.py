@@ -62,7 +62,7 @@ class CoreCaptureModule(BaseModule):
         )
 
         core.settings.register(
-            path="detection/display",
+            path="calibrate/display",
             factory=self._build_display_overlay_settings,
             title="Display",
             owner=self.key,
@@ -70,7 +70,7 @@ class CoreCaptureModule(BaseModule):
         )
 
         core.settings.register(
-            path="detection/capture_region",
+            path="calibrate/capture_region",
             factory=self._build_capture_region_settings,
             title="Capture Region",
             owner=self.key,
@@ -78,7 +78,7 @@ class CoreCaptureModule(BaseModule):
         )
 
         core.settings.register(
-            path="detection/slot_layout",
+            path="calibrate/slot_layout",
             factory=self._build_slot_layout_settings,
             title="Slot Layout",
             owner=self.key,

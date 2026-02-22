@@ -27,12 +27,12 @@ def test_setup_registers_panels_settings_window(core):
     assert any(p.id == "core_capture/controls" for p in core.panels.get_panels("primary"))
 
     tabs = core.settings.get_tabs()
-    assert any(t["path"] == "detection" for t in tabs)
-    detection_tab = next(t for t in tabs if t["path"] == "detection")
-    child_paths = [c["path"] for c in detection_tab["children"]]
-    assert "detection/capture_region" in child_paths
-    assert "detection/slot_layout" in child_paths
-    assert "detection/display" in child_paths
+    calibrate_tab = next((t for t in tabs if t["path"] == "calibrate"), None)
+    assert calibrate_tab is not None
+    child_paths = [c["path"] for c in calibrate_tab["children"]]
+    assert "calibrate/capture_region" in child_paths
+    assert "calibrate/slot_layout" in child_paths
+    assert "calibrate/display" in child_paths
 
     entries = core.windows.list_menu_entries()
     assert any(e.id == "core_capture/overlay" for e in entries)

@@ -73,9 +73,9 @@ class BrightnessDetectionModule(QObject, BaseModule, metaclass=_CombinedMeta):
         )
 
         core.settings.register(
-            path="detection/calibration",
+            path="calibrate/calibration",
             factory=self._build_calibration_settings,
-            title="Calibration",
+            title="Brightness Calibration",
             owner=self.key,
             order=40,
         )

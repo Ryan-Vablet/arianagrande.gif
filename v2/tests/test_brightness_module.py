@@ -67,7 +67,11 @@ def test_setup_registers_panels_and_settings(core, module):
     assert detection_tab is not None
     child_paths = [c["path"] for c in detection_tab.get("children", [])]
     assert "detection/brightness" in child_paths
-    assert "detection/calibration" in child_paths
+
+    calibrate_tab = next((t for t in tabs if t["path"] == "calibrate"), None)
+    assert calibrate_tab is not None
+    cal_paths = [c["path"] for c in calibrate_tab.get("children", [])]
+    assert "calibrate/calibration" in cal_paths
 
 
 def test_default_config_created(core, module):
