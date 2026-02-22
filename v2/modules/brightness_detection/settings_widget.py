@@ -5,7 +5,6 @@ from typing import Any
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
-    QCheckBox,
     QComboBox,
     QDoubleSpinBox,
     QGridLayout,
@@ -118,48 +117,6 @@ class BrightnessSettings(_SaveMixin, QWidget):
         grid.addWidget(self._spin_cd_min, 4, 1)
 
         layout.addLayout(_capped_row(grid, 340))
-
-        # --- Cast detection group ---
-        cast_header = QLabel("CAST DETECTION")
-        cast_header.setStyleSheet(
-            "font-family: monospace; font-size: 10px; font-weight: bold;"
-            " letter-spacing: 1px; color: #7a7a8e; padding-top: 6px;"
-        )
-        layout.addWidget(cast_header)
-
-        self._check_cast = QCheckBox("Enable cast detection")
-        layout.addWidget(self._check_cast)
-
-        self._dspin_cast_min = _dspin(0.0, 1.0, 0.05)
-        self._dspin_cast_max = _dspin(0.0, 1.0, 0.22)
-        self._spin_cast_confirm = _spin(1, 20, 2)
-        self._spin_cast_min_ms = _spin(0, 10000, 150)
-        self._spin_cast_max_ms = _spin(0, 30000, 3000)
-        self._spin_cast_grace = _spin(0, 5000, 120)
-        self._check_channeling = QCheckBox("Enable channeling")
-
-        cast_grid = QGridLayout()
-        cast_grid.setHorizontalSpacing(12)
-        cast_grid.setVerticalSpacing(6)
-
-        cast_grid.addWidget(_label("Cast Min Frac", LW), 0, 0)
-        cast_grid.addWidget(self._dspin_cast_min, 0, 1)
-        cast_grid.addWidget(_label("Cast Max Frac", LW), 0, 2)
-        cast_grid.addWidget(self._dspin_cast_max, 0, 3)
-
-        cast_grid.addWidget(_label("Confirm Frames", LW), 1, 0)
-        cast_grid.addWidget(self._spin_cast_confirm, 1, 1)
-
-        cast_grid.addWidget(_label("Cast Min (ms)", LW), 2, 0)
-        cast_grid.addWidget(self._spin_cast_min_ms, 2, 1)
-        cast_grid.addWidget(_label("Cast Max (ms)", LW), 2, 2)
-        cast_grid.addWidget(self._spin_cast_max_ms, 2, 3)
-
-        cast_grid.addWidget(_label("Cancel Grace (ms)", LW), 3, 0)
-        cast_grid.addWidget(self._spin_cast_grace, 3, 1)
-
-        layout.addLayout(_capped_row(cast_grid, 520))
-        layout.addWidget(self._check_channeling)
         layout.addStretch()
 
     def _populate(self) -> None:
@@ -174,24 +131,13 @@ class BrightnessSettings(_SaveMixin, QWidget):
             self._combo_region.setCurrentIndex(idx)
 
         self._spin_cd_min.setValue(int(cfg.get("cooldown_min_ms", 2000)))
-        self._check_cast.setChecked(bool(cfg.get("cast_detection_enabled", True)))
-        self._dspin_cast_min.setValue(float(cfg.get("cast_min_fraction", 0.05)))
-        self._dspin_cast_max.setValue(float(cfg.get("cast_max_fraction", 0.22)))
-        self._spin_cast_confirm.setValue(int(cfg.get("cast_confirm_frames", 2)))
-        self._spin_cast_min_ms.setValue(int(cfg.get("cast_min_ms", 150)))
-        self._spin_cast_max_ms.setValue(int(cfg.get("cast_max_ms", 3000)))
-        self._spin_cast_grace.setValue(int(cfg.get("cast_cancel_grace_ms", 120)))
-        self._check_channeling.setChecked(bool(cfg.get("channeling_enabled", True)))
 
     def _connect_signals(self) -> None:
-        for w in (self._spin_darken, self._spin_cd_min, self._spin_cast_confirm,
-                   self._spin_cast_min_ms, self._spin_cast_max_ms, self._spin_cast_grace):
+        for w in (self._spin_darken, self._spin_cd_min):
             w.valueChanged.connect(self._save_all)
-        for w in (self._dspin_trigger, self._dspin_change, self._dspin_cast_min, self._dspin_cast_max):
+        for w in (self._dspin_trigger, self._dspin_change):
             w.valueChanged.connect(self._save_all)
         self._combo_region.currentIndexChanged.connect(self._save_all)
-        self._check_cast.toggled.connect(self._save_all)
-        self._check_channeling.toggled.connect(self._save_all)
 
     def _save_all(self) -> None:
         cfg = self._read_cfg()
@@ -200,14 +146,6 @@ class BrightnessSettings(_SaveMixin, QWidget):
         cfg["change_fraction"] = self._dspin_change.value()
         cfg["detection_region"] = self._combo_region.currentData() or "top_left"
         cfg["cooldown_min_ms"] = self._spin_cd_min.value()
-        cfg["cast_detection_enabled"] = self._check_cast.isChecked()
-        cfg["cast_min_fraction"] = self._dspin_cast_min.value()
-        cfg["cast_max_fraction"] = self._dspin_cast_max.value()
-        cfg["cast_confirm_frames"] = self._spin_cast_confirm.value()
-        cfg["cast_min_ms"] = self._spin_cast_min_ms.value()
-        cfg["cast_max_ms"] = self._spin_cast_max_ms.value()
-        cfg["cast_cancel_grace_ms"] = self._spin_cast_grace.value()
-        cfg["channeling_enabled"] = self._check_channeling.isChecked()
         self._write_cfg(cfg)
         if self._module_ref:
             self._module_ref._sync_config_to_analyzer()
@@ -222,8 +160,18 @@ class CalibrationSettings(_SaveMixin, QWidget):
         self._key = module_key
         self._module_ref = module_ref
         self._slot_buttons: list[QPushButton] = []
+        self._slot_row_layout: QHBoxLayout | None = None
         self._build_ui()
         self._update_status()
+        self._core.subscribe("config.changed", self._on_config_changed)
+
+    def _on_config_changed(self, namespace: str = "") -> None:
+        if namespace != "core_capture":
+            return
+        cc_cfg = self._core.get_config("core_capture")
+        new_count = cc_cfg.get("slots", {}).get("count", 10)
+        if new_count != len(self._slot_buttons):
+            self._rebuild_slot_buttons()
 
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
@@ -245,7 +193,6 @@ class CalibrationSettings(_SaveMixin, QWidget):
         self._result_label.setStyleSheet("font-size: 11px;")
         layout.addWidget(self._result_label)
 
-        # Per-slot recalibrate buttons
         slot_header = QLabel("PER-SLOT RECALIBRATE")
         slot_header.setStyleSheet(
             "font-family: monospace; font-size: 10px; font-weight: bold;"
@@ -253,22 +200,34 @@ class CalibrationSettings(_SaveMixin, QWidget):
         )
         layout.addWidget(slot_header)
 
-        cc_cfg = self._core.get_config("core_capture")
-        slot_count = cc_cfg.get("slots", {}).get("count", 10)
-
-        slot_row = QHBoxLayout()
-        slot_row.setSpacing(3)
-        for i in range(slot_count):
-            btn = QPushButton(str(i))
-            btn.setFixedSize(32, 32)
-            btn.setToolTip(f"Recalibrate slot {i}")
-            btn.clicked.connect(lambda checked, idx=i: self._on_calibrate_slot(idx))
-            self._slot_buttons.append(btn)
-            slot_row.addWidget(btn)
-        slot_row.addStretch()
-        layout.addLayout(slot_row)
+        self._slot_row_layout = QHBoxLayout()
+        self._slot_row_layout.setSpacing(3)
+        self._populate_slot_buttons()
+        layout.addLayout(self._slot_row_layout)
 
         layout.addStretch()
+
+    def _populate_slot_buttons(self) -> None:
+        cc_cfg = self._core.get_config("core_capture")
+        slot_count = cc_cfg.get("slots", {}).get("count", 10)
+        for i in range(slot_count):
+            btn = QPushButton(str(i + 1))
+            btn.setFixedSize(32, 32)
+            btn.setToolTip(f"Recalibrate slot {i + 1}")
+            btn.clicked.connect(lambda checked, idx=i: self._on_calibrate_slot(idx))
+            self._slot_buttons.append(btn)
+            self._slot_row_layout.addWidget(btn)
+        self._slot_row_layout.addStretch()
+
+    def _rebuild_slot_buttons(self) -> None:
+        for btn in self._slot_buttons:
+            self._slot_row_layout.removeWidget(btn)
+            btn.deleteLater()
+        self._slot_buttons.clear()
+        stretch = self._slot_row_layout.itemAt(self._slot_row_layout.count() - 1)
+        if stretch and stretch.spacerItem():
+            self._slot_row_layout.removeItem(stretch)
+        self._populate_slot_buttons()
 
     def _update_status(self) -> None:
         if self._module_ref and self._module_ref._analyzer:

@@ -48,6 +48,11 @@ class CaptureWorker(QThread):
                         self._capture = ScreenCapture(monitor_index=monitor_index)
                         self._capture.start()
 
+                    new_fps = max(1, min(120, int(new_cfg.get("polling_fps", 20))))
+                    if new_fps != fps:
+                        fps = new_fps
+                        interval_ms = int(1000 / fps)
+
                     bb_dict = new_cfg.get("bounding_box", {})
                     bbox = BoundingBox.from_dict(bb_dict)
                     frame = self._capture.grab_region(bbox)

@@ -29,7 +29,7 @@ class BrightnessDetectionModule(QObject, BaseModule, metaclass=_CombinedMeta):
     version = "1.0.0"
     description = "Detects slot cooldown states by comparing brightness to calibrated baselines"
     requires: list[str] = ["core_capture"]
-    optional: list[str] = ["cast_bar"]
+    optional: list[str] = []
     provides_services = ["slot_states", "baselines_calibrated"]
     hooks = ["slot_states_updated"]
 
@@ -77,6 +77,8 @@ class BrightnessDetectionModule(QObject, BaseModule, metaclass=_CombinedMeta):
             order=40,
         )
 
+        core.subscribe("config.changed", self._on_config_changed)
+
     def ready(self) -> None:
         cfg = self.core.get_config(self.key)
         saved = cfg.get("slot_baselines")
@@ -92,13 +94,7 @@ class BrightnessDetectionModule(QObject, BaseModule, metaclass=_CombinedMeta):
         if self._analyzer is None:
             return
 
-        cast_gate = True
-        if self.core.is_loaded("cast_bar"):
-            gate = self.core.get_service("cast_bar", "cast_gate_active")
-            if gate is not None:
-                cast_gate = bool(gate)
-
-        snapshots = self._analyzer.analyze_frame(frame, cast_gate_active=cast_gate)
+        snapshots = self._analyzer.analyze_frame(frame)
 
         states = []
         for s in snapshots:
@@ -120,6 +116,10 @@ class BrightnessDetectionModule(QObject, BaseModule, metaclass=_CombinedMeta):
         if name == "baselines_calibrated":
             return self._analyzer.has_baselines if self._analyzer else False
         return None
+
+    def _on_config_changed(self, namespace: str = "") -> None:
+        if namespace in (self.key, "core_capture"):
+            self._sync_config_to_analyzer()
 
     def on_config_changed(self, key: str, value: Any) -> None:
         self._sync_config_to_analyzer()
@@ -150,14 +150,6 @@ class BrightnessDetectionModule(QObject, BaseModule, metaclass=_CombinedMeta):
             "detection_region": "top_left",
             "detection_region_overrides": {},
             "cooldown_min_ms": 2000,
-            "cast_detection_enabled": True,
-            "cast_min_fraction": 0.05,
-            "cast_max_fraction": 0.22,
-            "cast_confirm_frames": 2,
-            "cast_min_ms": 150,
-            "cast_max_ms": 3000,
-            "cast_cancel_grace_ms": 120,
-            "channeling_enabled": True,
             "slot_baselines": [],
             "slot_display_names": [],
         }
@@ -204,7 +196,7 @@ class BrightnessDetectionModule(QObject, BaseModule, metaclass=_CombinedMeta):
             frame = capture.grab_region(bbox)
             self._analyzer.calibrate_single_slot(frame, slot_index)
             self._save_baselines()
-            return True, f"Slot {slot_index} calibrated ✓"
+            return True, f"Slot {slot_index + 1} calibrated ✓"
         except Exception as e:
             return False, str(e)
         finally:

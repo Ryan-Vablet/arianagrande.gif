@@ -1,0 +1,1 @@
+from modules.cast_detection.module import CastDetectionModule

@@ -34,6 +34,12 @@ class AutomationControls(QWidget):
         self._timer.setInterval(250)
         self._timer.timeout.connect(self._refresh_last_action)
 
+        self._core.subscribe("config.changed", self._on_config_changed)
+
+    def _on_config_changed(self, namespace: str = "") -> None:
+        if namespace == self._module.key:
+            self._refresh_list_name()
+
     def _build_ui(self) -> None:
         layout = QHBoxLayout(self)
         layout.setContentsMargins(4, 4, 4, 4)

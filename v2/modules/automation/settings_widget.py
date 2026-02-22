@@ -137,13 +137,27 @@ class KeybindSettings(_SaveMixin, QWidget):
         self._capture_thread = None
         self._capture_target: int | None = None
         self._rows: list[dict] = []
+        self._grid_container: QWidget | None = None
         self._build_ui()
+        self._core.subscribe("config.changed", self._on_config_changed)
+
+    def _on_config_changed(self, namespace: str = "") -> None:
+        if namespace != "core_capture":
+            return
+        cc_cfg = self._core.get_config("core_capture")
+        new_count = cc_cfg.get("slots", {}).get("count", 10)
+        if new_count != len(self._rows):
+            self._rebuild_keybind_rows()
 
     def _build_ui(self) -> None:
-        layout = QVBoxLayout(self)
-        layout.setSpacing(4)
-        layout.setContentsMargins(4, 4, 4, 4)
+        self._top_layout = QVBoxLayout(self)
+        self._top_layout.setSpacing(4)
+        self._top_layout.setContentsMargins(4, 4, 4, 4)
+        self._grid_container = self._make_grid_container()
+        self._top_layout.addWidget(self._grid_container)
+        self._top_layout.addStretch()
 
+    def _make_grid_container(self) -> QWidget:
         cc_cfg = self._core.get_config("core_capture")
         slot_count = cc_cfg.get("slots", {}).get("count", 10)
         cfg = self._read_cfg()
@@ -155,6 +169,8 @@ class KeybindSettings(_SaveMixin, QWidget):
         while len(display_names) < slot_count:
             display_names.append("")
 
+        self._rows.clear()
+
         grid = QGridLayout()
         grid.setHorizontalSpacing(8)
         grid.setVerticalSpacing(4)
@@ -164,7 +180,7 @@ class KeybindSettings(_SaveMixin, QWidget):
 
         for i in range(slot_count):
             row = i + 1
-            lbl = QLabel(str(i))
+            lbl = QLabel(str(i + 1))
             lbl.setStyleSheet("color: #aaa; font-size: 11px;")
             lbl.setFixedWidth(40)
             lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -184,8 +200,17 @@ class KeybindSettings(_SaveMixin, QWidget):
 
             self._rows.append({"btn": btn, "edit": edit})
 
-        layout.addLayout(_capped_row(grid, 400))
-        layout.addStretch()
+        container = QWidget()
+        container.setLayout(grid)
+        container.setMaximumWidth(400)
+        return container
+
+    def _rebuild_keybind_rows(self) -> None:
+        if self._grid_container is not None:
+            self._top_layout.removeWidget(self._grid_container)
+            self._grid_container.deleteLater()
+        self._grid_container = self._make_grid_container()
+        self._top_layout.insertWidget(0, self._grid_container)
 
     def _start_capture(self, slot_index: int) -> None:
         if self._capture_thread is not None:

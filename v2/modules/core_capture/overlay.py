@@ -30,6 +30,11 @@ class CaptureOverlay(QWidget):
 
         self._setup_window()
         self._refresh_from_config()
+        self._core.subscribe("config.changed", self._on_config_changed)
+
+    def _on_config_changed(self, namespace: str = "") -> None:
+        if namespace == self._key:
+            self._refresh_from_config()
 
     def _setup_window(self) -> None:
         self.setWindowFlags(

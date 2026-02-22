@@ -23,11 +23,6 @@ class _SlotRuntime:
     """Per-slot temporal memory for state transitions."""
     state: SlotState = SlotState.UNKNOWN
     cooldown_candidate_started_at: Optional[float] = None
-    cast_candidate_frames: int = 0
-    cast_started_at: Optional[float] = None
-    cast_ends_at: Optional[float] = None
-    last_cast_start_at: Optional[float] = None
-    last_cast_success_at: Optional[float] = None
     last_darkened_fraction: float = 0.0
 
 
@@ -56,16 +51,6 @@ class SlotAnalyzer:
         self._detection_region_overrides: dict[int, str] = {}
         self._cooldown_min_ms: int = 2000
         self._release_factor: float = 0.5
-
-        # Cast candidate detection
-        self._cast_detection_enabled: bool = True
-        self._cast_min_fraction: float = 0.05
-        self._cast_max_fraction: float = 0.22
-        self._cast_confirm_frames: int = 2
-        self._cast_min_ms: int = 150
-        self._cast_max_ms: int = 3000
-        self._cast_cancel_grace_ms: int = 120
-        self._channeling_enabled: bool = True
 
         self._recompute_layout()
 
@@ -98,14 +83,6 @@ class SlotAnalyzer:
         self._detection_region = str(cfg.get("detection_region", self._detection_region))
         self._detection_region_overrides = dict(cfg.get("detection_region_overrides", {}))
         self._cooldown_min_ms = int(cfg.get("cooldown_min_ms", self._cooldown_min_ms))
-        self._cast_detection_enabled = bool(cfg.get("cast_detection_enabled", True))
-        self._cast_min_fraction = float(cfg.get("cast_min_fraction", self._cast_min_fraction))
-        self._cast_max_fraction = float(cfg.get("cast_max_fraction", self._cast_max_fraction))
-        self._cast_confirm_frames = int(cfg.get("cast_confirm_frames", self._cast_confirm_frames))
-        self._cast_min_ms = int(cfg.get("cast_min_ms", self._cast_min_ms))
-        self._cast_max_ms = int(cfg.get("cast_max_ms", self._cast_max_ms))
-        self._cast_cancel_grace_ms = int(cfg.get("cast_cancel_grace_ms", self._cast_cancel_grace_ms))
-        self._channeling_enabled = bool(cfg.get("channeling_enabled", True))
 
         self._recompute_layout()
         if layout_changed:
@@ -210,9 +187,7 @@ class SlotAnalyzer:
     # Frame analysis
     # ------------------------------------------------------------------
 
-    def analyze_frame(
-        self, frame: np.ndarray, cast_gate_active: bool = True,
-    ) -> list[SlotSnapshot]:
+    def analyze_frame(self, frame: np.ndarray) -> list[SlotSnapshot]:
         """Analyze all slots in a frame and return per-slot snapshots."""
         now = time.time()
         snapshots: list[SlotSnapshot] = []
@@ -284,17 +259,15 @@ class SlotAnalyzer:
             else:
                 runtime.cooldown_candidate_started_at = None
 
-            state = self._determine_slot_state(
-                slot_cfg.index,
-                darkened_fraction,
-                changed_fraction,
-                raw_cooldown and not cooldown_pending,
-                now,
-                cast_gate_active,
-            )
-
-            if cooldown_pending and state == SlotState.READY:
+            if raw_cooldown and not cooldown_pending:
+                state = SlotState.ON_COOLDOWN
+            elif cooldown_pending:
                 state = SlotState.GCD
+            else:
+                state = SlotState.READY
+
+            runtime.state = state
+            runtime.last_darkened_fraction = darkened_fraction
 
             snapshots.append(SlotSnapshot(
                 index=slot_cfg.index,
@@ -306,100 +279,3 @@ class SlotAnalyzer:
 
         self._frame_count += 1
         return snapshots
-
-    # ------------------------------------------------------------------
-    # State machine
-    # ------------------------------------------------------------------
-
-    def _determine_slot_state(
-        self,
-        slot_index: int,
-        darkened_fraction: float,
-        changed_fraction: float,
-        is_raw_cooldown: bool,
-        now: float,
-        cast_gate_active: bool,
-    ) -> SlotState:
-        """State machine for one slot — cooldown + cast logic."""
-        runtime = self._runtime.setdefault(slot_index, _SlotRuntime())
-
-        cast_enabled = self._cast_detection_enabled
-        min_frac = self._cast_min_fraction
-        max_frac = self._cast_max_fraction
-        confirm_frames = max(1, self._cast_confirm_frames)
-        cast_min_sec = max(0.05, self._cast_min_ms / 1000.0)
-        cast_max_sec = max(cast_min_sec, self._cast_max_ms / 1000.0)
-        cancel_grace_sec = max(0.0, self._cast_cancel_grace_ms / 1000.0)
-        cast_candidate = min_frac <= darkened_fraction < max_frac
-
-        if not cast_enabled:
-            runtime.state = SlotState.ON_COOLDOWN if is_raw_cooldown else SlotState.READY
-            runtime.cast_candidate_frames = 0
-            runtime.cast_started_at = None
-            runtime.cast_ends_at = None
-            runtime.last_darkened_fraction = darkened_fraction
-            return runtime.state
-
-        if is_raw_cooldown:
-            runtime.state = SlotState.ON_COOLDOWN
-            runtime.cast_candidate_frames = 0
-            if runtime.cast_started_at is not None:
-                runtime.last_cast_success_at = now
-            runtime.cast_started_at = None
-            runtime.cast_ends_at = None
-            runtime.last_darkened_fraction = darkened_fraction
-            return runtime.state
-
-        # Currently casting/channeling
-        if runtime.state in (SlotState.CASTING, SlotState.CHANNELING):
-            cast_started_at = runtime.cast_started_at or now
-            elapsed = now - cast_started_at
-            if cast_candidate:
-                if (
-                    self._channeling_enabled
-                    and runtime.state == SlotState.CASTING
-                    and elapsed >= cast_max_sec
-                ):
-                    runtime.state = SlotState.CHANNELING
-                    runtime.cast_ends_at = None
-                runtime.last_darkened_fraction = darkened_fraction
-                return runtime.state
-            if elapsed < (cast_min_sec + cancel_grace_sec):
-                runtime.last_darkened_fraction = darkened_fraction
-                return runtime.state
-            # Cast ended
-            runtime.state = SlotState.READY
-            runtime.cast_started_at = None
-            runtime.cast_ends_at = None
-            runtime.cast_candidate_frames = 0
-            runtime.last_darkened_fraction = darkened_fraction
-            return runtime.state
-
-        # Potential new cast
-        if cast_candidate:
-            if not cast_gate_active:
-                runtime.cast_candidate_frames = 0
-                runtime.state = SlotState.READY
-                runtime.cast_started_at = None
-                runtime.cast_ends_at = None
-                runtime.last_darkened_fraction = darkened_fraction
-                return runtime.state
-            runtime.cast_candidate_frames += 1
-            if runtime.cast_candidate_frames >= confirm_frames:
-                runtime.state = SlotState.CASTING
-                runtime.cast_started_at = now
-                runtime.last_cast_start_at = now
-                runtime.cast_ends_at = now + cast_max_sec
-                runtime.last_darkened_fraction = darkened_fraction
-                return runtime.state
-            runtime.state = SlotState.READY
-            runtime.last_darkened_fraction = darkened_fraction
-            return runtime.state
-
-        # Default: ready
-        runtime.cast_candidate_frames = 0
-        runtime.state = SlotState.READY
-        runtime.cast_started_at = None
-        runtime.cast_ends_at = None
-        runtime.last_darkened_fraction = darkened_fraction
-        return runtime.state
