@@ -23,7 +23,7 @@ class AutomationModule(QObject, BaseModule, metaclass=_CombinedMeta):
     version = "1.0.0"
     description = "Priority-based key sending with multiple lists, auto/single fire, spell queue"
     requires: list[str] = ["core_capture"]
-    optional: list[str] = ["brightness_detection", "glow_detection", "cast_bar", "buff_tracking"]
+    optional: list[str] = ["brightness_detection", "cast_detection", "glow_detection", "buff_tracking"]
     provides_services = ["armed", "active_list_id", "last_action"]
     hooks = ["key_sent", "armed_changed", "list_switched"]
 
@@ -78,6 +78,7 @@ class AutomationModule(QObject, BaseModule, metaclass=_CombinedMeta):
             title="Priority",
             owner=self.key,
             order=0,
+            resizable=True,
         )
 
         core.settings.register(
@@ -121,7 +122,11 @@ class AutomationModule(QObject, BaseModule, metaclass=_CombinedMeta):
         if not self._key_sender:
             return
 
-        slot_states = self.core.get_service("brightness_detection", "slot_states") or []
+        slot_states = (
+            self.core.get_service("cast_detection", "slot_states")
+            or self.core.get_service("brightness_detection", "slot_states")
+            or []
+        )
         if not slot_states:
             return
 
@@ -341,12 +346,15 @@ class AutomationModule(QObject, BaseModule, metaclass=_CombinedMeta):
         self.list_changed_signal.connect(
             w.refresh_from_config, Qt.ConnectionType.QueuedConnection,
         )
-        if self.core.is_loaded("brightness_detection"):
-            bd = self.core.get_module("brightness_detection")
-            if bd and hasattr(bd, "slot_states_updated_signal"):
-                bd.slot_states_updated_signal.connect(
-                    w.update_states, Qt.ConnectionType.QueuedConnection,
-                )
+        state_source = None
+        if self.core.is_loaded("cast_detection"):
+            state_source = self.core.get_module("cast_detection")
+        elif self.core.is_loaded("brightness_detection"):
+            state_source = self.core.get_module("brightness_detection")
+        if state_source and hasattr(state_source, "slot_states_updated_signal"):
+            state_source.slot_states_updated_signal.connect(
+                w.update_states, Qt.ConnectionType.QueuedConnection,
+            )
         return w
 
     def _build_general_settings(self) -> Any:

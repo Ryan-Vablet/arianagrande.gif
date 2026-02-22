@@ -274,6 +274,17 @@ class DisplayOverlaySettings(_SaveMixin, QWidget):
         self._core.subscribe(
             "window.visibility_changed", self._on_window_visibility_changed
         )
+        self._core.subscribe("config.changed", self._on_config_changed)
+
+    def _on_config_changed(self, namespace: str = "") -> None:
+        if namespace != self._key:
+            return
+        cfg = self._read_cfg()
+        aot = cfg.get("display", {}).get("always_on_top", False)
+        if aot != self._check_aot.isChecked():
+            self._check_aot.blockSignals(True)
+            self._check_aot.setChecked(aot)
+            self._check_aot.blockSignals(False)
 
     def _on_overlay_toggled(self, checked: bool) -> None:
         self._save_all()
