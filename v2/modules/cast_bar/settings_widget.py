@@ -58,8 +58,57 @@ def _capped_row(inner, max_width: int = 420) -> QHBoxLayout:
     return outer
 
 
+class CastBarCalibrationSettings(QWidget):
+    """Capture region and live preview for cast bar calibration."""
+
+    def __init__(self, core: Any, module_key: str, module_ref: Any, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._core = core
+        self._key = module_key
+        self._module_ref = module_ref
+        self._build_ui()
+
+    def _build_ui(self) -> None:
+        layout = QVBoxLayout(self)
+        layout.setSpacing(8)
+        layout.setContentsMargins(4, 4, 4, 4)
+
+        from modules.core_capture.region_settings_widget import RegionSettingsWidget
+        self._region_widget = RegionSettingsWidget(
+            self._core, region_id="cast_bar", show_preview=True,
+        )
+        layout.addWidget(self._region_widget)
+
+        self._status_label = QLabel("Idle")
+        self._status_label.setStyleSheet("color: #999; font-size: 11px; padding-top: 4px;")
+        layout.addWidget(self._status_label)
+
+        layout.addStretch()
+
+        if self._module_ref:
+            from PyQt6.QtCore import Qt as QtConst
+            self._module_ref.cast_bar_updated_signal.connect(
+                self._on_state_updated, QtConst.ConnectionType.QueuedConnection,
+            )
+
+    def _on_state_updated(self, state: Any) -> None:
+        if state is None:
+            self._status_label.setText("Idle")
+            self._status_label.setStyleSheet("color: #999; font-size: 11px;")
+            return
+        if state.active:
+            pct = int(state.progress * 100)
+            mode = "Channeling" if state.channeling else "Casting"
+            self._status_label.setText(f"{mode} — {pct}%")
+            color = "#ffd37a" if state.channeling else "#88ff88"
+            self._status_label.setStyleSheet(f"color: {color}; font-size: 11px;")
+        else:
+            self._status_label.setText("No cast detected")
+            self._status_label.setStyleSheet("color: #999; font-size: 11px;")
+
+
 class CastBarSettings(QWidget):
-    """Settings for the cast bar detection module."""
+    """Detection threshold settings for the cast bar module."""
 
     def __init__(self, core: Any, module_key: str, module_ref: Any, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -83,20 +132,6 @@ class CastBarSettings(QWidget):
 
         self._check_enabled = QCheckBox("Enable cast bar detection")
         layout.addWidget(self._check_enabled)
-
-        # Capture region
-        region_header = QLabel("CAPTURE REGION")
-        region_header.setStyleSheet(
-            "font-family: monospace; font-size: 10px; font-weight: bold;"
-            " letter-spacing: 1px; color: #7a7a8e; padding-top: 6px;"
-        )
-        layout.addWidget(region_header)
-
-        from modules.core_capture.region_settings_widget import RegionSettingsWidget
-        self._region_widget = RegionSettingsWidget(
-            self._core, region_id="cast_bar", show_preview=True,
-        )
-        layout.addWidget(self._region_widget)
 
         # Detection thresholds
         thresh_header = QLabel("COLOR DETECTION")
@@ -162,18 +197,7 @@ class CastBarSettings(QWidget):
 
         layout.addLayout(_capped_row(sub_grid, 520))
 
-        # Status
-        self._status_label = QLabel("Idle")
-        self._status_label.setStyleSheet("color: #999; font-size: 11px; padding-top: 4px;")
-        layout.addWidget(self._status_label)
-
         layout.addStretch()
-
-        if self._module_ref:
-            from PyQt6.QtCore import Qt as QtConst
-            self._module_ref.cast_bar_updated_signal.connect(
-                self._on_state_updated, QtConst.ConnectionType.QueuedConnection,
-            )
 
     def _populate(self) -> None:
         cfg = self._read_cfg()
@@ -217,18 +241,3 @@ class CastBarSettings(QWidget):
             "h": self._dspin_sub_h.value(),
         }
         self._write_cfg(cfg)
-
-    def _on_state_updated(self, state: Any) -> None:
-        if state is None:
-            self._status_label.setText("Idle")
-            self._status_label.setStyleSheet("color: #999; font-size: 11px;")
-            return
-        if state.active:
-            pct = int(state.progress * 100)
-            mode = "Channeling" if state.channeling else "Casting"
-            self._status_label.setText(f"{mode} — {pct}%")
-            color = "#ffd37a" if state.channeling else "#88ff88"
-            self._status_label.setStyleSheet(f"color: {color}; font-size: 11px;")
-        else:
-            self._status_label.setText("No cast detected")
-            self._status_label.setStyleSheet("color: #999; font-size: 11px;")

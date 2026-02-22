@@ -67,6 +67,14 @@ class CastBarModule(QObject, BaseModule, metaclass=_CombinedMeta):
         )
 
         core.settings.register(
+            path="calibrate/cast_bar_calibration",
+            factory=self._build_calibration_settings,
+            title="Cast Bar Calibration",
+            owner=self.key,
+            order=50,
+        )
+
+        core.settings.register(
             path="detection/cast_bar",
             factory=self._build_settings,
             title="Cast Bar",
@@ -154,6 +162,10 @@ class CastBarModule(QObject, BaseModule, metaclass=_CombinedMeta):
 
     def teardown(self) -> None:
         pass
+
+    def _build_calibration_settings(self) -> Any:
+        from modules.cast_bar.settings_widget import CastBarCalibrationSettings
+        return CastBarCalibrationSettings(self.core, self.key, self)
 
     def _build_settings(self) -> Any:
         from modules.cast_bar.settings_widget import CastBarSettings
