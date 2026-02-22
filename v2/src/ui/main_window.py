@@ -28,6 +28,7 @@ logger = logging.getLogger(__name__)
 
 _LAYOUT_NS = "ui_layout"
 _MIN_PANEL_H = 60
+_PAD = 10
 
 
 class _DragHandle(QLabel):
@@ -410,17 +411,20 @@ class MainWindow(QMainWindow):
         toolbar.addWidget(self._status_label)
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
+        splitter.setHandleWidth(_PAD // 2)
 
         primary_scroll = QScrollArea()
         primary_scroll.setWidgetResizable(True)
         primary_scroll.setFrameShape(QFrame.Shape.NoFrame)
         self._primary_column = _PanelColumn("primary", self._core)
+        self._primary_column._layout.setContentsMargins(_PAD, _PAD, _PAD // 2, _PAD)
         primary_scroll.setWidget(self._primary_column)
 
         sidebar_scroll = QScrollArea()
         sidebar_scroll.setWidgetResizable(True)
         sidebar_scroll.setFrameShape(QFrame.Shape.NoFrame)
         self._sidebar_column = _PanelColumn("sidebar", self._core)
+        self._sidebar_column._layout.setContentsMargins(_PAD // 2, _PAD, _PAD, _PAD)
         sidebar_scroll.setWidget(self._sidebar_column)
 
         splitter.addWidget(primary_scroll)
