@@ -7,6 +7,7 @@ from typing import Any
 
 import numpy as np
 from PyQt6.QtCore import QObject, Qt, pyqtSignal
+from PyQt6.QtGui import QImage
 
 from src.core.base_module import BaseModule
 
@@ -34,12 +35,14 @@ class BrightnessDetectionModule(QObject, BaseModule, metaclass=_CombinedMeta):
     hooks = ["slot_states_updated"]
 
     slot_states_updated_signal = pyqtSignal(list)
+    frame_preview_signal = pyqtSignal(QImage)
 
     def __init__(self) -> None:
         QObject.__init__(self)
         BaseModule.__init__(self)
         self._analyzer: Any = None
         self._latest_states: list[dict] = []
+        self._calibration_widget: Any = None
 
     def setup(self, core: Any) -> None:
         super().setup(core)
@@ -107,6 +110,12 @@ class BrightnessDetectionModule(QObject, BaseModule, metaclass=_CombinedMeta):
         self._latest_states = states
         self.slot_states_updated_signal.emit(states)
         self.core.emit(f"{self.key}.slot_states_updated", states=states)
+
+        if self._calibration_widget is not None:
+            h, w, ch = frame.shape
+            rgb = frame[:, :, ::-1].copy()
+            qimg = QImage(rgb.data, w, h, ch * w, QImage.Format.Format_RGB888).copy()
+            self.frame_preview_signal.emit(qimg)
 
     def get_service(self, name: str) -> Any:
         if name == "slot_states":
@@ -190,7 +199,7 @@ class BrightnessDetectionModule(QObject, BaseModule, metaclass=_CombinedMeta):
             frame = capture.grab_region(bbox)
             self._analyzer.calibrate_single_slot(frame, slot_index)
             self._save_baselines()
-            return True, f"Slot {slot_index} calibrated ✓"
+            return True, f"Slot {slot_index + 1} calibrated ✓"
         except Exception as e:
             return False, str(e)
         finally:
@@ -245,4 +254,9 @@ class BrightnessDetectionModule(QObject, BaseModule, metaclass=_CombinedMeta):
 
     def _build_calibration_settings(self) -> Any:
         from modules.brightness_detection.settings_widget import CalibrationSettings
-        return CalibrationSettings(self.core, self.key, self)
+        w = CalibrationSettings(self.core, self.key, self)
+        self._calibration_widget = w
+        self.frame_preview_signal.connect(
+            w.update_preview, Qt.ConnectionType.QueuedConnection,
+        )
+        return w

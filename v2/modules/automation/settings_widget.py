@@ -164,7 +164,7 @@ class KeybindSettings(_SaveMixin, QWidget):
 
         for i in range(slot_count):
             row = i + 1
-            lbl = QLabel(str(i))
+            lbl = QLabel(str(i + 1))
             lbl.setStyleSheet("color: #aaa; font-size: 11px;")
             lbl.setFixedWidth(40)
             lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)

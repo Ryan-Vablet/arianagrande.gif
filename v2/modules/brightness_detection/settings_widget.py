@@ -151,6 +151,19 @@ class BrightnessSettings(_SaveMixin, QWidget):
             self._module_ref._sync_config_to_analyzer()
 
 
+def _slot_btn_style(color: str) -> str:
+    return (
+        f"QPushButton {{ background: {color}; color: white;"
+        f" border: 1px solid #555; border-radius: 4px;"
+        f" font-size: 11px; font-weight: bold; font-family: monospace;"
+        f" padding: 2px 0px; }}"
+    )
+
+
+_SLOT_UNKNOWN_COLOR = "#444455"
+_SLOT_CALIBRATED_COLOR = "#336633"
+
+
 class CalibrationSettings(_SaveMixin, QWidget):
     """Baseline calibration controls — detection/calibration subtab."""
 
@@ -160,6 +173,7 @@ class CalibrationSettings(_SaveMixin, QWidget):
         self._key = module_key
         self._module_ref = module_ref
         self._slot_buttons: list[QPushButton] = []
+        self._preview_label: QLabel | None = None
         self._build_ui()
         self._update_status()
 
@@ -183,6 +197,23 @@ class CalibrationSettings(_SaveMixin, QWidget):
         self._result_label.setStyleSheet("font-size: 11px;")
         layout.addWidget(self._result_label)
 
+        # Live preview
+        preview_header = QLabel("LIVE PREVIEW")
+        preview_header.setStyleSheet(
+            "font-family: monospace; font-size: 10px; font-weight: bold;"
+            " letter-spacing: 1px; color: #7a7a8e; padding-top: 6px;"
+        )
+        layout.addWidget(preview_header)
+
+        self._preview_label = QLabel()
+        self._preview_label.setMinimumHeight(50)
+        self._preview_label.setStyleSheet(
+            "background: #1a1a2a; border: 1px solid #3a3a4a; border-radius: 3px;"
+        )
+        self._preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._preview_label.setText("Start capture to see preview")
+        layout.addWidget(self._preview_label)
+
         # Per-slot recalibrate buttons
         slot_header = QLabel("PER-SLOT RECALIBRATE")
         slot_header.setStyleSheet(
@@ -191,22 +222,39 @@ class CalibrationSettings(_SaveMixin, QWidget):
         )
         layout.addWidget(slot_header)
 
-        cc_cfg = self._core.get_config("core_capture")
-        slot_count = cc_cfg.get("slots", {}).get("count", 10)
-
-        slot_row = QHBoxLayout()
-        slot_row.setSpacing(3)
-        for i in range(slot_count):
-            btn = QPushButton(str(i))
-            btn.setFixedSize(32, 32)
-            btn.setToolTip(f"Recalibrate slot {i}")
-            btn.clicked.connect(lambda checked, idx=i: self._on_calibrate_slot(idx))
-            self._slot_buttons.append(btn)
-            slot_row.addWidget(btn)
-        slot_row.addStretch()
-        layout.addLayout(slot_row)
+        self._slot_row_layout = QHBoxLayout()
+        self._slot_row_layout.setSpacing(4)
+        self._populate_slot_buttons()
+        layout.addLayout(self._slot_row_layout)
 
         layout.addStretch()
+
+    def _populate_slot_buttons(self) -> None:
+        cc_cfg = self._core.get_config("core_capture")
+        slot_count = cc_cfg.get("slots", {}).get("count", 10)
+        calibrated = set()
+        if self._module_ref and self._module_ref._analyzer:
+            calibrated = set(self._module_ref._analyzer.get_baselines().keys())
+
+        for i in range(slot_count):
+            color = _SLOT_CALIBRATED_COLOR if i in calibrated else _SLOT_UNKNOWN_COLOR
+            btn = QPushButton(str(i + 1))
+            btn.setMinimumHeight(28)
+            btn.setStyleSheet(_slot_btn_style(color))
+            btn.setToolTip(f"Recalibrate slot {i + 1}")
+            btn.clicked.connect(lambda checked, idx=i: self._on_calibrate_slot(idx))
+            self._slot_buttons.append(btn)
+            self._slot_row_layout.addWidget(btn, 1)
+
+    def update_preview(self, qimg: "QImage") -> None:
+        if self._preview_label and not qimg.isNull():
+            from PyQt6.QtGui import QPixmap
+            pixmap = QPixmap.fromImage(qimg)
+            avail_w = max(50, self._preview_label.width() - 4)
+            scaled = pixmap.scaledToWidth(
+                avail_w, Qt.TransformationMode.SmoothTransformation,
+            )
+            self._preview_label.setPixmap(scaled)
 
     def _update_status(self) -> None:
         if self._module_ref and self._module_ref._analyzer:
@@ -220,6 +268,15 @@ class CalibrationSettings(_SaveMixin, QWidget):
             else:
                 self._status_label.setText("Baselines: not calibrated")
                 self._status_label.setStyleSheet("color: #999; font-size: 11px;")
+            self._refresh_button_colors()
+
+    def _refresh_button_colors(self) -> None:
+        calibrated = set()
+        if self._module_ref and self._module_ref._analyzer:
+            calibrated = set(self._module_ref._analyzer.get_baselines().keys())
+        for i, btn in enumerate(self._slot_buttons):
+            color = _SLOT_CALIBRATED_COLOR if i in calibrated else _SLOT_UNKNOWN_COLOR
+            btn.setStyleSheet(_slot_btn_style(color))
 
     def _on_calibrate_all(self) -> None:
         if not self._module_ref:

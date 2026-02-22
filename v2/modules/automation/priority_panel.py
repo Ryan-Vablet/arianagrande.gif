@@ -303,7 +303,7 @@ class PriorityPanel(QWidget):
             if item_type == "slot":
                 idx = item.get("slot_index", 0)
                 kb = keybinds[idx] if idx < len(keybinds) else "?"
-                name = display_names[idx] if idx < len(display_names) and display_names[idx].strip() else f"Slot {idx}"
+                name = display_names[idx] if idx < len(display_names) and display_names[idx].strip() else f"Slot {idx + 1}"
             elif item_type == "manual":
                 aid = str(item.get("action_id", "")).lower()
                 action = manual_by_id.get(aid)
@@ -391,7 +391,7 @@ class PriorityPanel(QWidget):
         display_names = cfg.get("slot_display_names", [])
         for idx in available:
             kb = keybinds[idx] if idx < len(keybinds) else ""
-            name = display_names[idx] if idx < len(display_names) and display_names[idx].strip() else f"Slot {idx}"
+            name = display_names[idx] if idx < len(display_names) and display_names[idx].strip() else f"Slot {idx + 1}"
             label = f"[{kb or '?'}] {name}"
             item = QListWidgetItem(label)
             item.setData(Qt.ItemDataRole.UserRole, idx)
