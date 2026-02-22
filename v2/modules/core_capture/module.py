@@ -128,11 +128,13 @@ class CoreCaptureModule(BaseModule):
 
         self._worker = CaptureWorker(self.core, module_manager)
 
-        if self._preview_widget is not None:
-            from PyQt6.QtCore import Qt
-            self._worker.region_frame_captured.connect(
-                self._on_region_preview, Qt.ConnectionType.QueuedConnection,
-            )
+        from PyQt6.QtCore import Qt
+        self._worker.region_frame_captured.connect(
+            self._on_region_preview, Qt.ConnectionType.QueuedConnection,
+        )
+        self._worker.region_error.connect(
+            self._on_region_error, Qt.ConnectionType.QueuedConnection,
+        )
 
         self._worker.start()
         self._is_running = True
@@ -172,6 +174,11 @@ class CoreCaptureModule(BaseModule):
             self._preview_widget.update_preview(qimg)
         self.core.emit(
             "capture.region_frame", region_id=region_id, qimg=qimg,
+        )
+
+    def _on_region_error(self, region_id: str, error: str) -> None:
+        self.core.emit(
+            "capture.region_error", region_id=region_id, error=error,
         )
 
     def _draw_action_bar_overlay(self, painter: "QPainter", region_rect: "QRect") -> None:

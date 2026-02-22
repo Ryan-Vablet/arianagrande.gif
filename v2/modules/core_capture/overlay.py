@@ -22,9 +22,13 @@ class CaptureOverlay(QWidget):
         self._capture_active = False
         self._show_outline = False
         self._monitor_geometry = QRect(0, 0, 1920, 1080)
+        self._error_regions: set[str] = set()
 
         self._setup_window()
         self._refresh_from_config()
+        self._core.subscribe("config.changed", self._on_config_changed)
+        self._core.subscribe("capture.region_error", self._on_region_error)
+        self._core.subscribe("capture.region_frame", self._on_region_frame_ok)
 
     def _setup_window(self) -> None:
         self.setWindowFlags(
@@ -58,6 +62,22 @@ class CaptureOverlay(QWidget):
 
         self.setGeometry(self._monitor_geometry)
 
+    def _on_config_changed(self, namespace: str = "") -> None:
+        if namespace == self._key:
+            cfg = self._core.get_config(self._key)
+            self._show_outline = cfg.get("overlay", {}).get("show_active_screen_outline", False)
+        self.update()
+
+    def _on_region_error(self, region_id: str = "", **_: Any) -> None:
+        if region_id and region_id not in self._error_regions:
+            self._error_regions.add(region_id)
+            self.update()
+
+    def _on_region_frame_ok(self, region_id: str = "", **_: Any) -> None:
+        if region_id and region_id in self._error_regions:
+            self._error_regions.discard(region_id)
+            self.update()
+
     def set_capture_active(self, active: bool) -> None:
         self._capture_active = active
         self.update()
@@ -76,33 +96,53 @@ class CaptureOverlay(QWidget):
                 continue
             bbox = BoundingBox.from_dict(bb_dict)
             region_rect = QRect(bbox.left, bbox.top, bbox.width, bbox.height)
+            is_error = region.id in self._error_regions
 
-            color = QColor(region.overlay_color)
-            painter.setPen(QPen(color, 2))
-            painter.setBrush(Qt.BrushStyle.NoBrush)
-            painter.drawRect(region_rect)
+            if is_error:
+                err_color = QColor("#CC3333")
+                err_fill = QColor("#CC3333")
+                err_fill.setAlpha(40)
+                painter.setPen(QPen(err_color, 2, Qt.PenStyle.DashLine))
+                painter.setBrush(err_fill)
+                painter.drawRect(region_rect)
 
-            if region.label:
-                label_color = QColor(region.overlay_color)
-                label_color.setAlpha(200)
-                painter.setPen(label_color)
-                font = QFont("monospace", 8)
+                painter.setPen(QColor("#FF6666"))
+                font = QFont("monospace", 9)
                 font.setBold(True)
                 painter.setFont(font)
+                text = f"✖ {region.label or region.id} — OUT OF BOUNDS"
                 painter.drawText(
-                    bbox.left + 4,
-                    bbox.top - 4,
-                    region.label,
+                    region_rect.adjusted(4, 2, -4, -2),
+                    Qt.AlignmentFlag.AlignCenter,
+                    text,
                 )
+            else:
+                color = QColor(region.overlay_color)
+                painter.setPen(QPen(color, 2))
+                painter.setBrush(Qt.BrushStyle.NoBrush)
+                painter.drawRect(region_rect)
 
-            if region.overlay_draw is not None:
-                try:
-                    region.overlay_draw(painter, region_rect)
-                except Exception as e:
-                    logger.error(
-                        "overlay_draw for region '%s' failed: %s",
-                        region.id, e,
+                if region.label:
+                    label_color = QColor(region.overlay_color)
+                    label_color.setAlpha(200)
+                    painter.setPen(label_color)
+                    font = QFont("monospace", 8)
+                    font.setBold(True)
+                    painter.setFont(font)
+                    painter.drawText(
+                        bbox.left + 4,
+                        bbox.top - 4,
+                        region.label,
                     )
+
+                if region.overlay_draw is not None:
+                    try:
+                        region.overlay_draw(painter, region_rect)
+                    except Exception as e:
+                        logger.error(
+                            "overlay_draw for region '%s' failed: %s",
+                            region.id, e,
+                        )
 
         painter.end()
 

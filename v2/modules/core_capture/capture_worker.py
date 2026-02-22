@@ -16,6 +16,7 @@ class CaptureWorker(QThread):
     """Capture loop: grab all registered regions, emit previews, distribute to modules."""
 
     region_frame_captured = pyqtSignal(str, QImage)
+    region_error = pyqtSignal(str, str)
 
     def __init__(self, core: Any, module_manager: Any) -> None:
         super().__init__()
@@ -53,28 +54,29 @@ class CaptureWorker(QThread):
 
                     regions = self._core.capture_regions.get_all()
                     for region in regions:
-                        bb_dict = self._core.capture_regions.get_bbox_dict(region.id)
-                        if not bb_dict:
-                            continue
-                        bbox = BoundingBox.from_dict(bb_dict)
-                        frame = self._capture.grab_region(bbox)
+                        try:
+                            bb_dict = self._core.capture_regions.get_bbox_dict(region.id)
+                            if not bb_dict:
+                                continue
+                            bbox = BoundingBox.from_dict(bb_dict)
+                            frame = self._capture.grab_region(bbox)
 
-                        h, w, ch = frame.shape
-                        rgb = frame[:, :, ::-1].copy()
-                        qimg = QImage(
-                            rgb.data, w, h, ch * w,
-                            QImage.Format.Format_RGB888,
-                        ).copy()
-                        self.region_frame_captured.emit(region.id, qimg)
+                            h, w, ch = frame.shape
+                            rgb = frame[:, :, ::-1].copy()
+                            qimg = QImage(
+                                rgb.data, w, h, ch * w,
+                                QImage.Format.Format_RGB888,
+                            ).copy()
+                            self.region_frame_captured.emit(region.id, qimg)
 
-                        if region.callback is not None:
-                            try:
+                            if region.callback is not None:
                                 region.callback(frame)
-                            except Exception as e:
-                                logger.error(
-                                    "Region '%s' callback error: %s",
-                                    region.id, e, exc_info=True,
-                                )
+                        except Exception as e:
+                            logger.error(
+                                "Region '%s' capture error: %s",
+                                region.id, e,
+                            )
+                            self.region_error.emit(region.id, str(e))
 
                 except Exception as e:
                     logger.error("Capture error: %s", e, exc_info=True)

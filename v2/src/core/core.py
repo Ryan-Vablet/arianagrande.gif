@@ -36,9 +36,11 @@ class Core:
 
     def save_config(self, namespace: str, data: dict) -> None:
         self._config.set(namespace, data)
+        self.emit("config.changed", namespace=namespace)
 
     def update_config(self, namespace: str, updates: dict) -> None:
         self._config.update(namespace, updates)
+        self.emit("config.changed", namespace=namespace)
 
     # --- Module access ---
     def get_module(self, key: str) -> BaseModule | None:

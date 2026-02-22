@@ -37,6 +37,15 @@ def _spin(min_val: int, max_val: int, value: int = 0) -> QSpinBox:
     return s
 
 
+_PREVIEW_OK_STYLE = (
+    "background: #1a1a2a; border: 1px solid #3a3a4a; border-radius: 3px;"
+)
+_PREVIEW_ERR_STYLE = (
+    "background: #2a1215; border: 2px solid #cc3333; border-radius: 3px;"
+    " color: #ff6666; font-size: 11px; font-weight: bold;"
+)
+
+
 class RegionSettingsWidget(QWidget):
     """Bbox spinboxes + live preview for a registered capture region.
 
@@ -58,6 +67,7 @@ class RegionSettingsWidget(QWidget):
         self._region_id = region_id
         self._show_preview = show_preview
         self._preview_label: QLabel | None = None
+        self._has_error = False
         self._build_ui()
         self._populate()
         self._connect_signals()
@@ -99,9 +109,7 @@ class RegionSettingsWidget(QWidget):
         if self._show_preview:
             self._preview_label = QLabel()
             self._preview_label.setMinimumHeight(50)
-            self._preview_label.setStyleSheet(
-                "background: #1a1a2a; border: 1px solid #3a3a4a; border-radius: 3px;"
-            )
+            self._preview_label.setStyleSheet(_PREVIEW_OK_STYLE)
             self._preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self._preview_label.setText("Start capture to see preview")
             layout.addWidget(self._preview_label)
@@ -137,15 +145,32 @@ class RegionSettingsWidget(QWidget):
         self._core.subscribe(
             "capture.region_frame", self._on_region_frame,
         )
+        self._core.subscribe(
+            "capture.region_error", self._on_region_error,
+        )
 
     def _on_region_frame(self, region_id: str = "", qimg: Any = None) -> None:
         if region_id != self._region_id:
             return
         if self._preview_label is None or qimg is None or qimg.isNull():
             return
+        if self._has_error:
+            self._has_error = False
+            self._preview_label.setStyleSheet(_PREVIEW_OK_STYLE)
         pixmap = QPixmap.fromImage(qimg)
         avail_w = max(50, self._preview_label.width() - 4)
         scaled = pixmap.scaledToWidth(
             avail_w, Qt.TransformationMode.SmoothTransformation,
         )
         self._preview_label.setPixmap(scaled)
+
+    def _on_region_error(self, region_id: str = "", error: str = "") -> None:
+        if region_id != self._region_id:
+            return
+        if self._preview_label is None:
+            return
+        if not self._has_error:
+            self._has_error = True
+            self._preview_label.clear()
+            self._preview_label.setStyleSheet(_PREVIEW_ERR_STYLE)
+            self._preview_label.setText("⚠ Region out of bounds")
