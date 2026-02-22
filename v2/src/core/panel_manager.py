@@ -15,6 +15,7 @@ class PanelRegistration:
     collapsible: bool = True
     default_collapsed: bool = False
     visible: bool = True
+    resizable: bool = False
 
 
 class PanelManager:
@@ -32,11 +33,12 @@ class PanelManager:
         order: int = 50,
         collapsible: bool = True,
         default_collapsed: bool = False,
+        resizable: bool = False,
     ) -> None:
         self._panels[id] = PanelRegistration(
             id=id, area=area, factory=factory, title=title,
             owner=owner, order=order, collapsible=collapsible,
-            default_collapsed=default_collapsed,
+            default_collapsed=default_collapsed, resizable=resizable,
         )
 
     def get_panels(self, area: str) -> list[PanelRegistration]:

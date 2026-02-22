@@ -234,58 +234,6 @@ def test_cooldown_min_duration_gcd(analyzer):
         assert snap.state == SlotState.GCD
 
 
-def test_cast_detection_basic():
-    """Intermediate darkened fraction → CASTING when enabled."""
-    a = SlotAnalyzer()
-    a.update_config({
-        "slot_count": 1, "slot_gap": 0, "slot_padding": 0,
-        "bbox_width": 40, "bbox_height": 40,
-        "darken_threshold": 30, "trigger_fraction": 0.30,
-        "cooldown_min_ms": 0,
-        "cast_detection_enabled": True,
-        "cast_min_fraction": 0.05,
-        "cast_max_fraction": 0.25,
-        "cast_confirm_frames": 1,
-        "detection_region": "full",
-    })
-    bright = _solid_frame(40, 40, 200)
-    a.calibrate_baselines(bright)
-
-    # Create frame with ~15% darkened pixels (in cast range)
-    cast_frame = bright.copy()
-    h = cast_frame.shape[0]
-    rows = max(1, int(h * 0.15))
-    cast_frame[:rows, :, :] = 100
-
-    results = a.analyze_frame(cast_frame)
-    assert results[0].state == SlotState.CASTING
-
-
-def test_cast_gate_false_suppresses_casting():
-    a = SlotAnalyzer()
-    a.update_config({
-        "slot_count": 1, "slot_gap": 0, "slot_padding": 0,
-        "bbox_width": 40, "bbox_height": 40,
-        "darken_threshold": 30, "trigger_fraction": 0.30,
-        "cooldown_min_ms": 0,
-        "cast_detection_enabled": True,
-        "cast_min_fraction": 0.05,
-        "cast_max_fraction": 0.25,
-        "cast_confirm_frames": 1,
-        "detection_region": "full",
-    })
-    bright = _solid_frame(40, 40, 200)
-    a.calibrate_baselines(bright)
-
-    cast_frame = bright.copy()
-    h = cast_frame.shape[0]
-    rows = max(1, int(h * 0.15))
-    cast_frame[:rows, :, :] = 100
-
-    results = a.analyze_frame(cast_frame, cast_gate_active=False)
-    assert results[0].state == SlotState.READY
-
-
 def test_detection_region_top_left():
     """top_left region uses only top-left quadrant for analysis."""
     a = SlotAnalyzer()
@@ -293,7 +241,7 @@ def test_detection_region_top_left():
         "slot_count": 1, "slot_gap": 0, "slot_padding": 0,
         "bbox_width": 40, "bbox_height": 40,
         "darken_threshold": 30, "trigger_fraction": 0.30,
-        "cooldown_min_ms": 0, "cast_detection_enabled": False,
+        "cooldown_min_ms": 0,
         "detection_region": "top_left",
     })
     bright = _solid_frame(40, 40, 200)

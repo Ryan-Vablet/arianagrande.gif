@@ -74,7 +74,7 @@ def test_default_config_created(core, module):
     cfg = core.get_config("brightness_detection")
     assert cfg.get("darken_threshold") == 40
     assert cfg.get("trigger_fraction") == 0.30
-    assert cfg.get("cast_detection_enabled") is True
+    assert cfg.get("cooldown_min_ms") == 2000
 
 
 def test_get_service_slot_states(module):
