@@ -5,6 +5,7 @@ from typing import Any, Callable
 
 from src.core.activation_rules import ActivationRuleRegistry
 from src.core.base_module import BaseModule
+from src.core.capture_region_registry import CaptureRegionRegistry
 from src.core.config_manager import ConfigManager
 from src.core.panel_manager import PanelManager
 from src.core.settings_manager import SettingsManager
@@ -23,6 +24,7 @@ class Core:
         self.settings = SettingsManager()
         self.windows = WindowManager(config)
         self.activation_rules = ActivationRuleRegistry()
+        self.capture_regions = CaptureRegionRegistry(config)
         self.windows.on_visibility_changed(self._on_window_visibility_changed)
 
     def _on_window_visibility_changed(self, window_id: str, visible: bool) -> None:

@@ -4,7 +4,7 @@ import logging
 from typing import Any
 
 from PyQt6.QtCore import Qt, QRect
-from PyQt6.QtGui import QColor, QPainter, QPen
+from PyQt6.QtGui import QColor, QFont, QPainter, QPen
 from PyQt6.QtWidgets import QWidget
 
 from src.models import BoundingBox
@@ -13,18 +13,13 @@ logger = logging.getLogger(__name__)
 
 
 class CaptureOverlay(QWidget):
-    """Transparent overlay showing capture region and slot layout."""
+    """Transparent overlay showing all registered capture regions."""
 
     def __init__(self, core: Any, module_key: str, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._core = core
         self._key = module_key
         self._capture_active = False
-
-        self._bbox = BoundingBox()
-        self._slot_count = 10
-        self._slot_gap = 2
-        self._slot_padding = 3
         self._show_outline = False
         self._monitor_geometry = QRect(0, 0, 1920, 1080)
 
@@ -43,15 +38,7 @@ class CaptureOverlay(QWidget):
 
     def _refresh_from_config(self) -> None:
         cfg = self._core.get_config(self._key)
-        bb = cfg.get("bounding_box", {})
-        self._bbox = BoundingBox.from_dict(bb)
-
-        slots = cfg.get("slots", {})
-        self._slot_count = int(slots.get("count", 10))
-        self._slot_gap = int(slots.get("gap", 2))
-        self._slot_padding = int(slots.get("padding", 3))
         self._show_outline = cfg.get("overlay", {}).get("show_active_screen_outline", False)
-
         self._update_monitor_geometry(cfg)
         self.update()
 
@@ -75,62 +62,60 @@ class CaptureOverlay(QWidget):
         self._capture_active = active
         self.update()
 
-    def _slot_analyzed_rects(self) -> list[QRect]:
-        total_width = self._bbox.width
-        total_height = self._bbox.height
-        gap = self._slot_gap
-        count = self._slot_count
-        padding = self._slot_padding
-
-        slot_w = max(1, (total_width - (count - 1) * gap) // count)
-        slot_h = total_height
-
-        rects: list[QRect] = []
-        for i in range(count):
-            x = i * (slot_w + gap)
-            inner_w = max(0, slot_w - 2 * padding)
-            inner_h = max(0, slot_h - 2 * padding)
-            rects.append(QRect(
-                self._bbox.left + x + padding,
-                self._bbox.top + padding,
-                inner_w,
-                inner_h,
-            ))
-        return rects
-
     def paintEvent(self, event: Any) -> None:
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
         if self._show_outline and self._capture_active:
-            w, h = self.width(), self.height()
-            if w > 0 and h > 0:
-                green = QColor("#00FF00")
-                for inset, alpha in [(4, 35), (3, 60), (2, 100), (1, 160)]:
-                    green.setAlpha(alpha)
-                    painter.setPen(QPen(green, 1))
-                    painter.setBrush(Qt.BrushStyle.NoBrush)
-                    painter.drawRect(inset, inset, w - 1 - 2 * inset, h - 1 - 2 * inset)
-                green.setAlpha(255)
-                painter.setPen(QPen(green, 1))
-                painter.drawRect(0, 0, w - 1, h - 1)
+            self._draw_screen_outline(painter)
 
-        # Green bounding box
-        pen = QPen(QColor("#00FF00"), 2)
-        painter.setPen(pen)
-        painter.setBrush(Qt.BrushStyle.NoBrush)
-        painter.drawRect(
-            self._bbox.left,
-            self._bbox.top,
-            self._bbox.width,
-            self._bbox.height,
-        )
+        regions = self._core.capture_regions.get_all()
+        for region in regions:
+            bb_dict = self._core.capture_regions.get_bbox_dict(region.id)
+            if not bb_dict:
+                continue
+            bbox = BoundingBox.from_dict(bb_dict)
+            region_rect = QRect(bbox.left, bbox.top, bbox.width, bbox.height)
 
-        # Magenta slot outlines
-        slot_pen = QPen(QColor("#FF00FF"), 1)
-        painter.setPen(slot_pen)
-        for rect in self._slot_analyzed_rects():
-            if rect.width() > 0 and rect.height() > 0:
-                painter.drawRect(rect)
+            color = QColor(region.overlay_color)
+            painter.setPen(QPen(color, 2))
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.drawRect(region_rect)
+
+            if region.label:
+                label_color = QColor(region.overlay_color)
+                label_color.setAlpha(200)
+                painter.setPen(label_color)
+                font = QFont("monospace", 8)
+                font.setBold(True)
+                painter.setFont(font)
+                painter.drawText(
+                    bbox.left + 4,
+                    bbox.top - 4,
+                    region.label,
+                )
+
+            if region.overlay_draw is not None:
+                try:
+                    region.overlay_draw(painter, region_rect)
+                except Exception as e:
+                    logger.error(
+                        "overlay_draw for region '%s' failed: %s",
+                        region.id, e,
+                    )
 
         painter.end()
+
+    def _draw_screen_outline(self, painter: QPainter) -> None:
+        w, h = self.width(), self.height()
+        if w <= 0 or h <= 0:
+            return
+        green = QColor("#00FF00")
+        for inset, alpha in [(4, 35), (3, 60), (2, 100), (1, 160)]:
+            green.setAlpha(alpha)
+            painter.setPen(QPen(green, 1))
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.drawRect(inset, inset, w - 1 - 2 * inset, h - 1 - 2 * inset)
+        green.setAlpha(255)
+        painter.setPen(QPen(green, 1))
+        painter.drawRect(0, 0, w - 1, h - 1)

@@ -20,7 +20,20 @@ def core(tmp_path):
         "polling_fps": 60,
         "bounding_box": {"top": 0, "left": 0, "width": 100, "height": 50},
     })
-    return Core(cfg)
+    c = Core(cfg)
+    return c
+
+
+def _register_primary_region(core_obj, callback):
+    """Register an action_bar region so the worker has something to capture."""
+    core_obj.capture_regions.register(
+        id="action_bar",
+        owner="core_capture",
+        config_namespace="core_capture",
+        config_key="bounding_box",
+        default_bbox={"top": 0, "left": 0, "width": 100, "height": 50},
+        callback=callback,
+    )
 
 
 def _mock_screen_capture():
@@ -33,6 +46,8 @@ def _mock_screen_capture():
 def test_worker_starts_and_stops(core):
     from modules.core_capture.capture_worker import CaptureWorker
 
+    callback = MagicMock()
+    _register_primary_region(core, callback)
     mm = MagicMock()
     worker = CaptureWorker(core, mm)
 
@@ -45,16 +60,12 @@ def test_worker_starts_and_stops(core):
     assert not worker.isRunning()
 
 
-def test_worker_emits_frame_captured(core):
-    """Verify frame_captured signal fires by checking process_frame was called with a frame.
-
-    Direct signal connection to a lambda won't deliver across threads without
-    a running QApplication event loop, so we verify the emission indirectly:
-    if process_frame receives frames, frame_captured.emit() also ran in the
-    same code path.
-    """
+def test_worker_emits_region_frame(core):
+    """Verify region callbacks are invoked by the worker."""
     from modules.core_capture.capture_worker import CaptureWorker
 
+    callback = MagicMock()
+    _register_primary_region(core, callback)
     mm = MagicMock()
     worker = CaptureWorker(core, mm)
 
@@ -64,12 +75,14 @@ def test_worker_emits_frame_captured(core):
         time.sleep(0.3)
         worker.stop()
 
-    assert mm.process_frame.call_count > 0
+    assert callback.call_count > 0
 
 
-def test_worker_calls_process_frame(core):
+def test_worker_calls_region_callback_with_frame(core):
     from modules.core_capture.capture_worker import CaptureWorker
 
+    callback = MagicMock()
+    _register_primary_region(core, callback)
     mm = MagicMock()
     worker = CaptureWorker(core, mm)
 
@@ -79,14 +92,16 @@ def test_worker_calls_process_frame(core):
         time.sleep(0.3)
         worker.stop()
 
-    assert mm.process_frame.call_count > 0
-    frame_arg = mm.process_frame.call_args[0][0]
+    assert callback.call_count > 0
+    frame_arg = callback.call_args[0][0]
     assert isinstance(frame_arg, np.ndarray)
 
 
 def test_worker_reads_config(core):
     from modules.core_capture.capture_worker import CaptureWorker
 
+    callback = MagicMock()
+    _register_primary_region(core, callback)
     mm = MagicMock()
     worker = CaptureWorker(core, mm)
 

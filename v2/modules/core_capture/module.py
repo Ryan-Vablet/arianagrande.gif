@@ -30,6 +30,19 @@ class CoreCaptureModule(BaseModule):
         if not cfg:
             core.save_config(self.key, self._default_config())
 
+        core.capture_regions.register(
+            id="action_bar",
+            owner=self.key,
+            config_namespace=self.key,
+            config_key="bounding_box",
+            default_bbox={"top": 900, "left": 500, "width": 400, "height": 50},
+            overlay_color="#00FF00",
+            label="Action Bar",
+            callback=self._on_primary_frame,
+            overlay_draw=self._draw_action_bar_overlay,
+            order=0,
+        )
+
         core.panels.register(
             id=f"{self.key}/preview",
             area="primary",
@@ -117,8 +130,8 @@ class CoreCaptureModule(BaseModule):
 
         if self._preview_widget is not None:
             from PyQt6.QtCore import Qt
-            self._worker.frame_captured.connect(
-                self._preview_widget.update_preview, Qt.ConnectionType.QueuedConnection
+            self._worker.region_frame_captured.connect(
+                self._on_region_preview, Qt.ConnectionType.QueuedConnection,
             )
 
         self._worker.start()
@@ -146,6 +159,42 @@ class CoreCaptureModule(BaseModule):
 
     def teardown(self) -> None:
         self.stop_capture()
+
+    # --- Region callbacks ---
+
+    def _on_primary_frame(self, frame: "np.ndarray") -> None:
+        module_manager = getattr(self.core, "_module_manager", None)
+        if module_manager:
+            module_manager.process_frame(frame)
+
+    def _on_region_preview(self, region_id: str, qimg: "QImage") -> None:
+        if region_id == "action_bar" and self._preview_widget is not None:
+            self._preview_widget.update_preview(qimg)
+        self.core.emit(
+            "capture.region_frame", region_id=region_id, qimg=qimg,
+        )
+
+    def _draw_action_bar_overlay(self, painter: "QPainter", region_rect: "QRect") -> None:
+        from PyQt6.QtCore import QRect
+        from PyQt6.QtGui import QColor, QPen
+        cfg = self.core.get_config(self.key)
+        slots = cfg.get("slots", {})
+        count = int(slots.get("count", 10))
+        gap = int(slots.get("gap", 2))
+        padding = int(slots.get("padding", 3))
+
+        total_w = region_rect.width()
+        total_h = region_rect.height()
+        slot_w = max(1, (total_w - (count - 1) * gap) // count)
+
+        painter.setPen(QPen(QColor("#FF00FF"), 1))
+        for i in range(count):
+            x = region_rect.x() + i * (slot_w + gap) + padding
+            y = region_rect.y() + padding
+            w = max(0, slot_w - 2 * padding)
+            h = max(0, total_h - 2 * padding)
+            if w > 0 and h > 0:
+                painter.drawRect(QRect(x, y, w, h))
 
     # --- Widget builders ---
 
