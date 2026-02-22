@@ -151,17 +151,7 @@ class BrightnessSettings(_SaveMixin, QWidget):
             self._module_ref._sync_config_to_analyzer()
 
 
-def _slot_btn_style(color: str) -> str:
-    return (
-        f"QPushButton {{ background: {color}; color: white;"
-        f" border: 1px solid #555; border-radius: 4px;"
-        f" font-size: 11px; font-weight: bold; font-family: monospace;"
-        f" padding: 2px 0px; }}"
-    )
-
-
-_SLOT_UNKNOWN_COLOR = "#444455"
-_SLOT_CALIBRATED_COLOR = "#336633"
+from modules.brightness_detection.status_widget import _STATE_COLORS, _btn_style
 
 
 class CalibrationSettings(_SaveMixin, QWidget):
@@ -232,15 +222,11 @@ class CalibrationSettings(_SaveMixin, QWidget):
     def _populate_slot_buttons(self) -> None:
         cc_cfg = self._core.get_config("core_capture")
         slot_count = cc_cfg.get("slots", {}).get("count", 10)
-        calibrated = set()
-        if self._module_ref and self._module_ref._analyzer:
-            calibrated = set(self._module_ref._analyzer.get_baselines().keys())
 
         for i in range(slot_count):
-            color = _SLOT_CALIBRATED_COLOR if i in calibrated else _SLOT_UNKNOWN_COLOR
             btn = QPushButton(str(i + 1))
             btn.setMinimumHeight(28)
-            btn.setStyleSheet(_slot_btn_style(color))
+            btn.setStyleSheet(_btn_style(_STATE_COLORS["unknown"]))
             btn.setToolTip(f"Recalibrate slot {i + 1}")
             btn.clicked.connect(lambda checked, idx=i: self._on_calibrate_slot(idx))
             self._slot_buttons.append(btn)
@@ -268,15 +254,17 @@ class CalibrationSettings(_SaveMixin, QWidget):
             else:
                 self._status_label.setText("Baselines: not calibrated")
                 self._status_label.setStyleSheet("color: #999; font-size: 11px;")
-            self._refresh_button_colors()
 
-    def _refresh_button_colors(self) -> None:
-        calibrated = set()
-        if self._module_ref and self._module_ref._analyzer:
-            calibrated = set(self._module_ref._analyzer.get_baselines().keys())
-        for i, btn in enumerate(self._slot_buttons):
-            color = _SLOT_CALIBRATED_COLOR if i in calibrated else _SLOT_UNKNOWN_COLOR
-            btn.setStyleSheet(_slot_btn_style(color))
+    def update_states(self, states: list[dict]) -> None:
+        for state_dict in states:
+            idx = state_dict.get("index", -1)
+            if 0 <= idx < len(self._slot_buttons):
+                slot_state = state_dict.get("state", "unknown")
+                btn = self._slot_buttons[idx]
+                color = _STATE_COLORS.get(slot_state, _STATE_COLORS["unknown"])
+                btn.setStyleSheet(_btn_style(color))
+                frac = state_dict.get("darkened_fraction", 0)
+                btn.setToolTip(f"Recalibrate slot {idx + 1}\n{slot_state} ({frac:.1%})")
 
     def _on_calibrate_all(self) -> None:
         if not self._module_ref:

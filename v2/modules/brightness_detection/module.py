@@ -259,4 +259,7 @@ class BrightnessDetectionModule(QObject, BaseModule, metaclass=_CombinedMeta):
         self.frame_preview_signal.connect(
             w.update_preview, Qt.ConnectionType.QueuedConnection,
         )
+        self.slot_states_updated_signal.connect(
+            w.update_states, Qt.ConnectionType.QueuedConnection,
+        )
         return w
